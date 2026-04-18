@@ -91,6 +91,10 @@ end
 #------------------------------
 # Forecasting block
 #------------------------------
+function makeForecastOutput(::Chan2020minn_type,Yfor3D)
+    return dataBVAR_TA(data_tab, var_list)
+end
+
 @doc raw"""
     Yfor3D = BEAVARs.forecast(VAROutput::VAROutput_Chan2020minn,VARSetup)
 
@@ -106,7 +110,7 @@ Generates forecasts from the Chan2020minn model output
 
 The function generates forecasts from the Chan2020minn model output.
 """
-function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup)
+function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_strct::BVARmodelDataSetup)
     @unpack store_β, store_Σ, YY = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
     n = size(YY,2);
@@ -125,7 +129,8 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup)
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
         end
     end
-    return Yfor3D
+    fcast_strct = BEAVARs.VARForecast(Yfor3D,data_strct.data_tab,data_strct.var_list)
+    return fcast_strct
 
 end # end function fcastChan2020minn()
 

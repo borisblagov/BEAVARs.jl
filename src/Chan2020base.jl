@@ -348,7 +348,35 @@ end
 
 
 @doc raw"""
-    BEAVARs.initMinn(YY,p)
+    BEAVARs.initMinn(YY, p)
+
+    Initializes necessary matrices for a Minnesota prior following Chan (2020).
+
+# Arguments
+- `YY::Matrix{Float64}`: A matrix of time-series data where rows represent time periods and columns represent variables.
+- `p::Int`: The number of lags to include in the model.
+
+# Returns
+- `Y::Matrix{Float64}`:         Dependent variables matrix after lag transformation.
+- `X::Matrix{Float64}`:         Independent variables matrix after lag transformation.
+- `T::Int`:                     Number of time periods after accounting for lags.
+- `n::Int`:                     The number of variables in the system.
+- `sigmaP::Vector{Float64}`:    A vector of variances for each variable, initialized using univariate AR(4) regressions.
+- `S_0::Diagonal{Float64}`:     The diagonal matrix of `sigmaP` prior variances for the Minnesota prior.
+- `Σt_inv::Matrix{Float64}`:    The inverse of the covariance matrix `Σ` initialized as `S_0 \ I`.
+- `Vβ_inv::Matrix{Float64}`:    The prior precision matrix for the regression coefficients, initialized as an identity matrix scaled by 1.0.
+- `Vβ_inv_vecView`:             A view of the diagonal elements of `Vβ_inv`, used for efficient updates.
+- `Σ_invsp::SparseMatrixCSC{Float64}`: A sparse matrix representing `I(T) ⊗ Σ^-1`, where `⊗` is the Kronecker product.
+- `Σt_LI::Vector{Int}`: Linear indices for updating the sparse matrix `Σ_invsp`.
+- `XtΣ_inv_den::Matrix{Float64}`:   A dense matrix for storing `X' * (I(T) ⊗ Σ^-1)`.
+- `XtΣ_inv_X::Matrix{Float64}`:     A dense matrix for storing `X' * (I(T) ⊗ Σ^-1) * X`.
+- `Xsur_den::Matrix{Float64}`:      A dense matrix in Seemingly Unrelated Regression (SUR) form.
+- `Xsur_CI::Vector{CartesianIndex}`: Cartesian indices mapping elements of `Xsur_den` to the original `X` matrix.
+- `X_CI::Vector{CartesianIndex}`:   Cartesian indices mapping elements of `X` to `Xsur_den`.
+- `k::Int`:                         The total number of regression coefficients, calculated as `n * p + intercept`.
+- `K_β::Matrix{Float64}`:           The variance-covariance matrix of the regression coefficients.
+- `beta::Vector{Float64}`:          A vector of regression coefficients, initialized to zeros.
+- `intercept::Int`:                 A flag indicating where the intercept is.
 """
 function initMinn(YY,p)
     Y, X, T, n, intercept       = mlagL(YY,p);

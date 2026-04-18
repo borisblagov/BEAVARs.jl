@@ -9,6 +9,7 @@ using   LinearAlgebra,
         XLSX,
         BenchmarkTools,
         ThreadSafeDicts
+        Plots
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat
@@ -34,8 +35,9 @@ abstract type BVARmodelType end         # types for models
 abstract type BVARmodelSetup end        # type for VAR setup parameters
 abstract type BVARmodelHypSetup end     # types for hyperparameters
 abstract type BVARmodelDataSetup end    # types for storing the data unputs to the models
-abstract type BVARmodelLoopSetup end        # type for VAR setup parameters
+abstract type BVARmodelLoopSetup end    # type for VAR setup parameters
 abstract type BVARmodelOutput end       # type for output storage
+abstract type BVARforecastOutput end    # type for forecast output storage
 
 
 # Structures for multiple dispatch across models
@@ -99,6 +101,13 @@ end
     n_irf::Int      # number of impulse responses
     n_fcst::Int     # number of forecast periods
     const_loc::Int  # location of the constant
+end
+
+# types for forecast output export
+@with_kw struct VARForecast <: BVARforecastOutput
+    Yfor3D::Array{}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
+    data_tab::TimeArray        # dataset in a TimeArray format   
+    var_list::Array{Symbol,1}  # variable names for the forecasts
 end
 
 
