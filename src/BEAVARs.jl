@@ -108,6 +108,7 @@ end
     Yfor3D::Array{}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
     data_tab::TimeArray        # dataset in a TimeArray format   
     var_list::Array{Symbol,1}  # variable names for the forecasts
+    n_fcst::Int                # number of forecast periods
 end
 
 

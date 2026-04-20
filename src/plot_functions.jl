@@ -75,9 +75,13 @@ The function uses the 3D array of forecasts (Yfor3D) and the variable names (var
 The layout of the plots is determined by the number of variables being forecasted.
 
 """
-function forecast_plot(fcast_strct::VARForecast)
-    @unpack Yfor3D, data_tab, var_list = fcast_strct
+function forecast_plot(fcast_strct::VARForecast;plot_fcastOnly=1)
+    @unpack Yfor3D, data_tab, var_list, n_fcst = fcast_strct
     n = size(Yfor3D,2);
+    p = size(Yfor3D,1)-n_fcst;
+    date_vec = timestamp(data_tab);
+    freq_    = Month(date_vec[end])-Month(date_vec[end-1]);
+
     Yfor_low1 = percentile_mat(Yfor3D,0.05,dims=3);
     Yfor_low = percentile_mat(Yfor3D,0.16,dims=3);
     Yfor_med = percentile_mat(Yfor3D,0.5,dims=3);
@@ -94,12 +98,21 @@ function forecast_plot(fcast_strct::VARForecast)
     #     lout = (convert(Int,ceil(n/4)),4)
     end
 
-    p = plot(layout=lout)
-    for ik in 1:n
-        plot!(p,Yfor_med[:,ik],w=0;ribbon=(Yfor_med[:,ik]-Yfor_low1[:,ik],Yfor_hih1[:,ik]-Yfor_med[:,ik]),fillalpha = 0.1,color=1,legend=false,subplot=ik,title=var_list[ik])
-        plot!(p,Yfor_med[:,ik],w=2;ribbon = (Yfor_med[:,ik]-Yfor_low[:,ik],Yfor_hih[:,ik]-Yfor_med[:,ik]),fillalpha=0.05,color=1,subplot=ik)
-        
+    p_hnd = plot(layout=lout)
+    if plot_fcastOnly == 1
+        fcast_date_vec = append!(date_vec[end-p+1:end],collect(date_vec[end]+freq_:freq_:date_vec[end]+freq_*n_fcst));
+        for ik in 1:n
+            plot!(p_hnd,fcast_date_vec,Yfor_med[:,ik],w=0;ribbon=(Yfor_med[:,ik]-Yfor_low1[:,ik],Yfor_hih1[:,ik]-Yfor_med[:,ik]),fillalpha = 0.1,color=1,legend=false,subplot=ik,title=var_list[ik])
+            plot!(p_hnd,fcast_date_vec,Yfor_med[:,ik],w=2;ribbon = (Yfor_med[:,ik]-Yfor_low[:,ik],Yfor_hih[:,ik]-Yfor_med[:,ik]),fillalpha=0.05,color=1,subplot=ik) 
+        end
+    else
+        # for ik in 1:n
+        #     fcast_date_vec = append!(date_vec,collect(date_vec[end]+freq_:freq_:date_vec[end]+freq_*n_fcst));
+        #     plot!(p_hnd,append!(values(data_tab[var_list[1]]),Yfor_med[p+1:end,ik]),w=0;ribbon = (Yfor_med[p+1:end,ik]-Yfor_low1[p+1:end,ik],Yfor_hih1[p+1:end,ik]- Yfor_med[p+1:end,ik]),fillalpha = 0.1,color=1,legend=false,subplot=ik,title=var_list[ik])
+        #     plot!(p_hnd,append!(values(data_tab[var_list[1]]),Yfor_med[p+1:end,ik]),w=2;ribbon = (Yfor_med[p+1:end,ik]-Yfor_low[p+1:end,ik] ,Yfor_hih[p+1:end,ik] - Yfor_med[p+1:end,ik]),fillalpha=0.05,color=1,subplot=ik) 
+        # end
     end
-    display(p)
+
+    display(p_hnd)
 
 end

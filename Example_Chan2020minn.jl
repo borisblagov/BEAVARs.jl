@@ -8,4 +8,4 @@ data_strct = makeDataSetup(model_type,data)
 out_strct = beavar(model_type, set_strct, hyp_strct, data_strct)
 
 fcast_strct = BEAVARs.forecast(out_strct, set_strct, data_strct)
-BEAVARs.forecast_plot(fcast_strct)
+BEAVARs.forecast_plot(fcast_strct,plot_fcastOnly=0)
