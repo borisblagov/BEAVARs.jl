@@ -5,11 +5,8 @@ using   LinearAlgebra,
         TimeSeries, 
         Parameters,
         ProgressMeter,
-        Plots,
         XLSX,
-        BenchmarkTools,
         ThreadSafeDicts
-        Plots
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat
