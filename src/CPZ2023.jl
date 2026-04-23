@@ -322,7 +322,8 @@ function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σ
     Y, X = mlagL!(YY,Y,X,p,n)
     (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors3!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,upd_these_vec);
     S_0 = Diagonal(sigmaP);
-    (idx_kappa1,idx_kappa2, V_Minn_vec, beta_Minn) = prior_Minn(n,p,sigmaP,hypSetup);
+    beta_Minn = zeros(n^2*p+n);
+    idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup);
     V_Minn_vec_inv = 1.0./V_Minn_vec;
     Σp_invsp.nzval[:] = Σt_inv[Σpt_ind];    
     Xsur_den[Xsur_CI] = X[X_CI]; 
@@ -487,14 +488,14 @@ end
     Sm_bit::Array{}
     store_Σt::Array{}        # 
     var_list::Array{}
-    freq_mix
+    freq_mix_tp::Tuple{Int,Int,Int}
 end
 # end of output strcutres
 #------------------------------
 
 #--------------------------------------
 # Forecast CPZ2023
-function forecast(VAROutput::VAROutput_CPZ2023,VARSetup)
+function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_strct::BVARmodelDataSetup)
     @unpack store_β, store_Σt, store_YY = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
 
@@ -518,7 +519,10 @@ function forecast(VAROutput::VAROutput_CPZ2023,VARSetup)
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Hermitian(Σ_draw)).U*randn(n,1))';    
         end
     end
-    return Yfor3D
+
+    fcast_strct = BEAVARs.VARForecast(Yfor3D,data_strct.dataHF_tab,data_strct.var_list,n_fcst)
+    
+    return fcast_strct
 
 end # end function fcastCPZ2023()
 

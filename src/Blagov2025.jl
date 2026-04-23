@@ -152,7 +152,7 @@ function Blagov2025(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,trans)
         end
     end
 
-    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh
+    return store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh
 end
 
 
@@ -168,9 +168,10 @@ end
     M_zsp::Array{} 
     z_vec::Array{} 
     Sm_bit::Array{}
-    store_Σ::Array{}        # 
+    freq_mix_tp
+    store_Σt::Array{}        # 
     store_h::Array{}        # 
-    s2_h_store::Array{}     # 
+    store_s2_h::Array{}     # 
     store_ρ::Array{}        # 
     store_σ_h2::Array{}     # 
     store_eh::Array{}       #
@@ -381,10 +382,10 @@ end
 
 
 """
-    
+    THIS FUNCTINO IS ON THE TODO LIST
 """
 function forecast(VAROutput::VAROutput_Blagov2025,VARSetup)
-    @unpack store_β, store_Σ, store_h, s2_h_store, store_ρ, store_σ_h2,store_eh, store_YY = VAROutput
+    @unpack store_β, store_Σt, store_h, s2_h_store, store_ρ, store_σ_h2,store_eh, store_YY = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
     YY = median(store_YY,dims=3)        # centres forecasts on the median (can be relaxed)
     n = size(YY,2);

@@ -6,7 +6,8 @@ using   LinearAlgebra,
         Parameters,
         ProgressMeter,
         XLSX,
-        ThreadSafeDicts
+        ThreadSafeDicts,
+        Plots
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat
@@ -109,22 +110,6 @@ end
 end
 
 
-# ------------------------
-# MAIN FUNCTION 
-# depreciated after moving to the syntax beavar(strcts)
-# function beavar(model_str=model_name::String,YY_tup... ;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_strct())
-#     model_type = BEAVARs.selectModel(model_str)
-    
-#     # checking if user supplied the hyperparameter structure
-#     if isa(hyp,hypDefault_strct)                    # if not supplied, make a default one
-#         hyp_strct = BEAVARs.makeHypSetup(model_type); # println("using the default hyperparameters")
-#     else                                            # else use supplied    
-#         hyp_strct = hyp; # println("using the supplied parameters")
-#     end
-        
-#     out_strct, set_strct = dispatchModel(model_type,YY_tup, hyp_strct,p,n_burn,n_save,n_irf,n_fcst);
-#     return out_strct, set_strct, hyp_strct
-# end
 
 @doc raw"""
     model_type, set_strct, hyp_strct = makeSetup(model_str::String; p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_strct())
@@ -167,6 +152,7 @@ function unpackLoopSetup(loop_strct::BVARmodelLoopSetup)
     data_strct = data;
     return model_type, set_strct, hyp_strct, data_strct
 end
+
 
 function selectConstLoc(model_str::String)
     if model_str == "Chan2020csv"
@@ -251,8 +237,8 @@ end
 function beavar(::Blagov2025_type, set_strct, hyp_strct, data_strct)
     println("Hello Blagov2025")
     @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_strct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_strct,hyp_strct,aggMix)    
-    out_strct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY,M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp)
+    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_strct,hyp_strct,aggMix)    
+    out_strct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh)
     return out_strct
 end
 
