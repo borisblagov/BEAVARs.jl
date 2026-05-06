@@ -543,3 +543,34 @@ end # end function fcastCPZ2023()
 
 
 
+## Model fit block
+
+"""
+    modelFit(out_strct,varSetup)
+
+     Generates fitted values from the model output and the model setup. Used for in-sample fit and for calculating residuals for the training sample.
+
+     Arguments:
+        out_strct: A structure with the model output, including the store_β and YY matrices
+        varSetup: A structure with the model setup, including p and const_loc
+
+     Returns:
+        Yfit: The fitted values from the model
+        Yact: The actual values from the data (YY)
+
+
+        ## TODO: rewrite the function so that we don't use the median and then add a plotting function to it
+"""
+function modelFit(out_strct::VAROutput_CPZ2023,varSetup::BEAVARs.VARSetup)
+    @unpack p, const_loc = varSetup;
+    YY = median(out_strct.store_YY,dims=3);
+    if const_loc == 1
+        Y,X,T,n = BEAVARs.mlagL(YY,p);
+    elseif const_loc == 0
+        Y,X,T,n = BEAVARs.mlag(YY,p);
+    end
+    Amed = reshape(percentile_mat(out_strct.store_β,0.5,dims=2),n*p+1,n)
+    Yfit = X*Amed;
+    Yact = @views Y
+    return Yfit, Yact
+end

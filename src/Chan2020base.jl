@@ -328,18 +328,17 @@ function prior_NonConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetu
 
 
     for j = 1:n*p+1       # for j=1:n*p+1 
-    l = ceil((j-1)/n)       # Here we need a float, as afterwards we will divide by l 
-    idx = mod(j-1,n);       # this will count if its own lag, non-own lag, or constant
-    if idx==0
-        idx = n;
-    end
-    if j == 1
-        C[j] = c3;
-    else
-        C[j] = c1/(l^2*sigmaP_vec[idx]);
-        push!(idx_kappa1,idx_count)
-    end
-
+        l = ceil((j-1)/n)       # Here we need a float, as afterwards we will divide by l 
+        idx = mod(j-1,n);       # this will count if its own lag, non-own lag, or constant
+        if idx==0
+            idx = n;
+        end
+        if j == 1
+            C[j] = c3;
+        else
+            C[j] = c1/(l^2*sigmaP_vec[idx]);
+            push!(idx_kappa1,idx_count)
+        end
     end
     return idx_kappa1,idx_kappa2, C, beta_Minn
 

@@ -42,7 +42,7 @@ Creates lags of a matrix for a VAR representation with a constant in X on the le
 # Arguments
         Yfull: a matrix of dimensions T+p x N returns a matrix Y with dimensions TxN and X with dimenions Tx(N*p+1)
 """
-function mlagL(Yfull::Matrix{Float64},p::Integer)
+function mlagL(Yfull::Array{Float64},p::Integer)
     (Tf, n) = size(Yfull)
     T = Tf-p;
     X = zeros(T,n*p+1)
