@@ -320,7 +320,7 @@ end
 """
 function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,intercept,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,upd_these_vec,K_β,beta)
     Y, X = mlagL!(YY,Y,X,p,n)
-    (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors3!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,upd_these_vec);
+    (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,upd_these_vec);
     S_0 = Diagonal(sigmaP);
     beta_Minn = zeros(n^2*p+n);
     idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup);
@@ -347,7 +347,11 @@ end
 
 
 @doc raw"""
-    Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior
+    CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
+
+Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
+
+
 """
 function CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
     @unpack p, nburn,nsave, const_loc = varSetup
@@ -494,7 +498,7 @@ end
 #------------------------------
 
 #--------------------------------------
-# Forecast CPZ2023
+# Forecast Block for CPZ2023
 
 @doc raw"""
     forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_strct::BVARmodelDataSetup)
@@ -511,17 +515,15 @@ function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_str
     @unpack store_β, store_Σt, store_YY = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
 
-
-    n = size(YY,2);
-
+    n = size(store_YY,2);
     Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
     #YY = median(store_YY,dims=3)
     # Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     Yfor3D[1:p,:,:] .= @views store_YY[end-p+1:end,:,:];
 
     for i_draw = 1:nsave
-        # Yfor3D[1:p,:,i_draw] .= @views store_YY[end-p+1:end,:,i_draw];
-        Yfor3D[1:p,:,i_draw] .= @views YY[end-p+1:end,:];
+        Yfor3D[1:p,:,i_draw] .= @views store_YY[end-p+1:end,:,i_draw];
+        # Yfor3D[1:p,:,i_draw] .= @views YY[end-p+1:end,:];
         Yfor = @views Yfor3D[:,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views store_Σt[:,:,i_draw];

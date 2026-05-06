@@ -128,7 +128,25 @@ function updatePriors!(Y,X,n::Int,mu_prior,deltaP,sigmaP,intercept)
     return deltaP, sigmaP, mu_prior
 end
 
-function updatePriors3!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,BitVec)
+@doc raw"""
+    updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,BitVec)
+
+    Updates the vectors of prior variance and mean, `sigmaP`, and `deltaP`, by redoing the AR(p) regression.
+    It only updates the entries that are supplied using `BitVec`
+
+    # Arguments
+        # Arguments
+            Y: Matrix of dependent variables with dimensions Txn
+            X: Matrix of independent variables with dimensions Txk
+            n: Number of dependent variables
+            mu_prior: Vector of prior means for the dependent variables
+            deltaP: Matrix to store updated regression coefficients
+            sigmaP: Vector to store updated variances of residuals
+            intercept: Integer indicating the position of the constant in X (1 for left, 0 for right)
+            BitVec: BitVector indicating which variables to update
+
+"""
+function updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,BitVec)
     # Do univariate AR(p) linear regressions with constant,
     # if intercept = 1, constant is on the left of X (bottom of beta in X*beta)
     

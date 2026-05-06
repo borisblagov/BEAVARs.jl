@@ -130,7 +130,7 @@ function Blagov2025(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,trans)
         YYt             = BEAVARs.Blagov2025_draw_wz!(YYt,longyo,cB,Σ_invsp,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym);
 
         # update priors
-        (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors3!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,updP_vec);
+        (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,updP_vec);
         S_0                         = Diagonal(sigmaP);       
         (idx_kappa1,idx_kappa2, Vβ_Minn, β_Minn) = prior_NonConj(n,p,sigmaP,hypSetup);
         A_0     = reshape(β_Minn,k,n);
