@@ -310,8 +310,7 @@ function Blagov2025_createMagg(timeHF,freq_mix)
         end
         
     elseif freq_mix==(3,12,0)||freq_mix==(3,12,1)
-        # add here the case for yearly and quarterly data
-        #TODO
+        #TODO: add here the case for yearly and quarterly data
     end
     timeLF = filter(d -> month(d) in selected_months, timeHF_sh);
     Tpfhor = length(timeHF_sh);

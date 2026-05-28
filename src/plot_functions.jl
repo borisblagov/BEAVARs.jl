@@ -106,6 +106,8 @@ function forecast_plot(fcast_strct::VARForecast;plot_fcastOnly=1)
             plot!(p_hnd,fcast_date_vec,Yfor_med[:,ik],w=2;ribbon = (Yfor_med[:,ik]-Yfor_low[:,ik],Yfor_hih[:,ik]-Yfor_med[:,ik]),fillalpha=0.05,color=1,subplot=ik) 
         end
     else
+        # TODO: add plotting functionality for Chan2020minn to plot the complete time series
+        println("plot_fcastOnly=0 has not been implemented yet, use plot_fcastOnly=1 or delete the keyword (default is 1)")
         # for ik in 1:n
         #     fcast_date_vec = append!(date_vec,collect(date_vec[end]+freq_:freq_:date_vec[end]+freq_*n_fcst));
         #     plot!(p_hnd,append!(values(data_tab[var_list[1]]),Yfor_med[p+1:end,ik]),w=0;ribbon = (Yfor_med[p+1:end,ik]-Yfor_low1[p+1:end,ik],Yfor_hih1[p+1:end,ik]- Yfor_med[p+1:end,ik]),fillalpha = 0.1,color=1,legend=false,subplot=ik,title=var_list[ik])

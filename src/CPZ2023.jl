@@ -90,7 +90,7 @@ Generates an M matrix such that `z = My + eps`. `y` is a vector of unobserved hi
 !!! note "Important"
     The function currently accepts only one variable in z_tab, has to be extended. If you have both GDP and Consumption which are observed in LF and Z_tab has 2 columns, the O-matrix will be wrong, see below
 
-#TODO        
+# TODO: add support for multiple z_tab variables
 """
 function CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf;scVal=10e-8)
     
