@@ -1,5 +1,6 @@
 /Manifest.toml
-.vscode/settings.json
+/.vscode/settings.json
 /docs/build/
 /dev
 /data
+/.vscode
