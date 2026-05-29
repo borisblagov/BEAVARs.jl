@@ -381,12 +381,12 @@ end
 
 
 """
-    THIS FUNCTINO IS ON THE TODO LIST
+    # TODO THIS FUNCTINO IS ON THE TODO LIST
 """
 function forecast(VAROutput::VAROutput_Blagov2025,VARSetup)
     @unpack store_β, store_Σt, store_h, s2_h_store, store_ρ, store_σ_h2,store_eh, store_YY = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
-    YY = median(store_YY,dims=3)        # centres forecasts on the median (can be relaxed)
+    # YY = median(store_YY,dims=3)        # centres forecasts on the median (can be relaxed)
     n = size(YY,2);
 
     Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
