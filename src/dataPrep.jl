@@ -86,7 +86,13 @@ hf_ta = merge(hf_ta,hf_ta_temp)
 # if 3, take logs
 hf_ta_temp = map((timestamp, values) -> (timestamp, log.(values)), dataHF_TA[varList_HF[transHF_vec.==3]])
 hf_ta = merge(hf_ta,hf_ta_temp)
-# if 7 take percentage changes
+# if 4, take differences
+hf_ta_temp = diff(dataHF_TA[varList_HF[transHF_vec.==4]]);
+hf_ta = merge(hf_ta,hf_ta_temp)
+# if 5 caclulate log changes in decimals (e.g. 0.01 is 1%)
+hf_ta_temp = percentchange(dataHF_TA[varList_HF[transHF_vec.==5]], :log);
+hf_ta = merge(hf_ta,hf_ta_temp)
+# if 7 caclulate percentage changes in decimals (e.g. 0.01 is 1%)
 hf_ta_temp = percentchange(dataHF_TA[varList_HF[transHF_vec.==7]]);
 hf_ta = merge(hf_ta,hf_ta_temp)
 # if 8, multiply by 100
