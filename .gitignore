@@ -5,3 +5,5 @@
 /data
 /.vscode
 .vscode/settings.json
+Manifest.toml
+/docs/Manifest.toml
