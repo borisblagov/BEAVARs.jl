@@ -90,7 +90,7 @@ Generates an M matrix such that `z = My + eps`. `y` is a vector of unobserved hi
 !!! note "Important"
     The function currently accepts only one variable in z_tab, has to be extended. If you have both GDP and Consumption which are observed in LF and Z_tab has 2 columns, the O-matrix will be wrong, see below
 
-# TODO: add support for multiple z_tab variables
+# TODO: add support for z_tab variables with various lengths
 """
 function CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf;scVal=10e-8)
     z_var_pos  = indexin(varNamesLF,fvarNames); # positions of the variables in z
@@ -159,16 +159,16 @@ function CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         M_z[(ii_z-1)*T_z + 1:T_z + (ii_z-1)*T_z,:] = M_inter_ii;    # , should be fixed by stacking the M_inter_ii
         z_vec[(ii_z-1)*T_z + 1:T_z + (ii_z-1)*T_z,]  = values(z_tab[varNamesLF[ii_z]]);
     end
-    M_zsp = M_z;                        # Leftover from when trying sparse matrices, should be fixed by stacking the M_inter_ii
+    # M_zsp = M_z;                        # Leftover from when trying sparse matrices, should be fixed by stacking the M_inter_ii
     O_zsp = Matrix(I,T_z*n_z,T_z*n_z).*scVal;   # this works only if we have one z variable (with T_z length)
     for ii = 1:n_z
         if flagFirstRow[ii] == 1             
             O_zsp[1+(ii-1)*T_z,1+(ii-1)*T_z] = scVal*1000   # add a higher value to the error for the first observation if we don't have a full quarter/year in the beginning, as we will not be able to have a hard constraint in the beginning
         end
     end
-    MOiM = M_zsp'*(O_zsp\M_zsp);
-    MOiz = M_zsp'*(O_zsp\z_vec);
-    return M_zsp, z_vec, T_z, MOiM, MOiz
+    MOiM = M_z'*(O_zsp\M_z);
+    MOiz = M_z'*(O_zsp\z_vec);
+    return M_z, z_vec, T_z, MOiM, MOiz
 end
 
 @doc raw"""
