@@ -1,6 +1,7 @@
 using BEAVARs
 using Parameters
 using Plots
+using LinearAlgebra, Statistics
 # Blagov2025
 model_type, set_struct, hyp_struct= makeSetup("CPZ2023",n_burn=50;n_save=10,p=2)
 dataHF_tab, dataLF_tab, varList = BEAVARs.readSpec("bgtest","data/Specifications_mfvar.xlsx");
@@ -27,6 +28,6 @@ plot(yy1[:,ik]); plot!(yy_low[:,ik]); plot!(yy_high[:,ik])
 plot(M_zsp*yy1[Sm_bit'])
 plot!(z_vec)
 
-Yfor3D = BEAVARs.forecast(out_strct,varSetup);
+Yfor3D = BEAVARs.forecast(out_struct,set_struct,data_struct);
 
 

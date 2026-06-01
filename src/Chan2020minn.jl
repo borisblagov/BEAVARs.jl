@@ -160,24 +160,4 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup,trueYY)
 
 end # end function fcastChan2020minn()
 
-# depreciated after moving to the syntax beavar(strcts)
-#------------------------------
-# dispatchModel block
-#------------------------------
-# function dispatchModel(::Chan2020minn_type,YY_tup, hyper_str, p,n_burn,n_save,n_irf,n_fcst)
-#     println("Hello Minn")
-#     intercept = 1;
-#     if isa(YY_tup[1],Array{})
-#         YY = YY_tup[1];
-#     elseif isa(YY_tup[1],TimeArray{})
-#         YY_TA = YY_tup[1];
-#         YY = values(YY_TA)
-#         varList = colnames(YY_TA)
-#     end
-#     set_struct = VARSetup(p,n_save,n_burn,n_irf,n_fcst,intercept);
-#     store_β, store_Σ = Chan2020minn(YY,set_struct,hyper_str);
-#     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY)
-#     return out_struct, set_struct
-# end
-
 

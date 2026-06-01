@@ -110,6 +110,17 @@ end
 end
 
 
+# types for forecast output export
+@with_kw struct VAR_MF_Forecast <: BVARforecastOutput
+    YforHF3D::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x nsave
+    YforLF3D::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x nsave
+    dataHF_tab::TimeArray      # High frequency dataset in a TimeArray format   
+    dataLF_tab::TimeArray      # Low frequency dataset in a TimeArray format 
+    var_list::Array{Symbol,1}  # variable names for the forecasts
+    n_fcst::Int                # number of forecast periods of the low-frequency variable
+end
+
+
 
 @doc raw"""
     model_type, set_struct, hyp_struct = makeSetup(model_str::String; p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct())
@@ -124,7 +135,7 @@ Only the first argument is mandatory, rest is optional with default values.
     n_burn:    number of burn-in draws that will be discarded, default is 2000
     n_save:    number of retained draws (total is then nburn + nsave), default is 1000
     n_irf:     horizon of impulse responses, default is 16
-    n_fcst:    horizon of forecasting periods, default is 8
+    n_fcst:    horizon of forecasting periods of the lowest frequency variable, default is 8
     hyp:       hyperparameter structure populated with default values for each model. See the relevant papers/documentation for details. To generate your own see the relevant structures below.
 
 See also [`hypChan2020`](@ref), [`hypBGR2010`](@ref).
@@ -225,8 +236,8 @@ end
 function beavar(::CPZ2023_type, set_struct, hyp_struct, data_struct)
     println("Hello CPZ2023")
     @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_struct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
-    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY,M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp);
+    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
+    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY,M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg);
     return out_struct
 end
 

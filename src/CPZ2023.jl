@@ -44,11 +44,16 @@ end
 
 
 @doc raw"""
+    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)    
+
+    Prepare one large table with the full dataset  `fataHF_tab` with both low and high-frequency variables with low-freq having `NaNs`. 
+    It will extend the table with n_fcst, which is the amoung of *low frequency* time periods.
+
     varOrder must be a `Vector{Symbol}` and not `Vector{Vector{Symbol}}`
     e.g. [varNamesLF; varNamesHF] and not [varNamesLF, varNamesHF]
     aggMix = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
 """
-function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix)
+function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
     varNamesLF = colnames(dataLF_tab)
     # z_tab = dataLF_tab[.!isnan.(dataLF_tab)];
     z_tab = dataLF_tab;
@@ -66,6 +71,15 @@ function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix)
     end 
     # tuple showing the specification: 1, 3, 12 are monthly quarterly, annually and 0,1 is growth rates or log-levels
     freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),aggMix) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
+
+        
+    # add the forecast periods to the data
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(n_fcst+1)) # the added quarters for the forecast. We add one more which will be deleted just to make sure that we have enough months to cover the whole quarter (e.g. Q2 is 01.04. but monthly it is up to 01.06.)
+    datesHF_fcast = (datesHF[end]+freqH_date:freqH_date:datesLF_fcast[end]-freqH_date);      # the added high frequency data for the forecast
+
+    ta = TimeArray(datesHF_fcast, fill(NaN,size(datesHF_fcast,1),length(fvarNames)))
+    rename!(ta, varOrder)
+    fdataHF_tab = [fdataHF_tab; ta];
     return fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames
 end
 
@@ -98,7 +112,7 @@ function CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         T_z = size(z_tab,1)
         n_z = 1
     else
-        T_z, n_z = size(z_tab);  # TODO this currently supports only a balanced panel of observed variables. E.g. you cannot have GDP but not have consumption
+        T_z, n_z = size(z_tab);  # TODO this currently supports only a balanced panel of low frequency observed variables. E.g. you cannot have GDP but not have consumption
     end
     M_z = zeros(T_z*n_z,nm)
     z_vec = zeros(T_z*n_z,)
@@ -170,6 +184,67 @@ function CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
     MOiz = M_z'*(O_zsp\z_vec);
     return M_z, z_vec, T_z, MOiM, MOiz
 end
+
+
+
+@doc raw"""
+    M_inter_agg = CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp)
+
+    Generate an M matrix to aggregate low frequency to high frequency such that M*high_freq_tab = low_freq_tab
+"""
+function CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp)
+    T_z = length(fdatesLF);
+    Tf = length(fdatesHF);
+    M_inter_agg = zeros(T_z,Tf)
+    flagFirstRow = zeros(1,);                              # if we don't have a full quarter/year we will not be able to have a hard constraint in the beginning, set the error to a higher value
+
+    M_inter_agg = zeros(T_z,Tf)
+
+    if size(fdatesHF,1)!==size(M_inter_agg,2)
+        # error("The size of M does not match the number of dates available in z_tab. Maybe the low-frequency data is longer? The problem is with variable number ", z_var_pos[ii_z])
+    end
+
+    # we need to watch out with the dates due to how the intertemporal constraint works Take for example growth rates Q and M
+    # y_t = 1/3 y_t - 2/3 y_{t-1} \dots - - 2/3 y_{t-3} - 1/3 y_{t-5}
+    # Intuitively, Q1 quarterly GDP (e.g. 01.01.2000) is the weighted sum of the monthly March, February, January, December, November, and October
+    # if y_t^Q is 01.01.2000, we need +2 and -2 months for the weights
+    if freq_mix_tp==(1,3,0)
+        # monthly and quarterly data with growth rates
+        hfWeights = [1/3; 2/3; 3/3; 2/3; 1/3]; n_hfw = size(hfWeights,1); #number of weights, depends on the variable transformation and frequency
+        hf_num1 = 1; hf_num2 = 1;  # this solves the range below ii_M-div((n_hfw-hf_num1),2): ii_M+div((n_hfw-hf_num2),2). This should give the indices -2, -1, 0, +1, +2
+    elseif freq_mix_tp==(3,12,0)
+        # quarterly and yearly data with growth rates
+        hfWeights = [1/4; 2/4; 3/4; 1; 3/4; 2/4; 1/4]; n_hfw = size(hfWeights,1); #number of weights, depends on the variable transformation and frequency
+        hf_num1 = 1; hf_num2 = 1;  # this solves the range below ii_M-div((n_hfw-hf_num1),2): ii_M+div((n_hfw-hf_num2),2). This should give the indices -3, -2, -1, 0, +1, +2, +3
+    elseif freq_mix_tp==(1,3,1)
+        # monthly and quarterly data in levels
+        hfWeights = [1/3; 1/3; 1/3]; n_hfw = size(hfWeights,1); #number of weights, depends on the variable transformation and frequency
+        hf_num1 = 3; hf_num2 = -1;  # this solves the range below ii_M-div((n_hfw-hf_num),2): ii_M+div((n_hfw-hf_num),2). This should give the indices -0, +1, +2
+    elseif freq_mix_tp==(3,12,1)
+        # quarterly and yearly data in levels
+        hfWeights = [1/4; 1/4; 1/4; 1/4]; n_hfw = size(hfWeights,1); #number of weights, depends on the variable transformation and frequency
+        hf_num1 = 4; hf_num2 = -3;  # this solves the range below ii_M-div((n_hfw-hf_num),2): ii_M+div((n_hfw-hf_num),2). This should give the indices -0, +1, +2
+    else
+        error("This combination of frequencies and transformation has not been implemented")
+    end
+
+    for ii_zi in eachindex(fdatesLF) # iterator going through each time point in datesHF
+        if ii_zi == 1 # check if we have a full quarter/year in the beginning, otherwise we will try to acces negative indices in the matrix M
+            ii_M = findall(fdatesHF.==fdatesLF[ii_zi])[1]       # find the low-frequency index that corresponds to the high-frequency missing value
+            MrowRange = ii_M-div((n_hfw-hf_num1),2): ii_M+div((n_hfw-hf_num2),2);
+            start_value = max(1, MrowRange[1]); stop_value = MrowRange[end]; positive_range = start_value:stop_value
+            M_inter_agg[ii_zi,start_value:stop_value]=hfWeights[MrowRange.>0];
+            flagFirstRow[1] = 1;
+        else
+            ii_M = findall(fdatesHF.==fdatesLF[ii_zi])[1]       # find the low-frequency index that corresponds to the high-frequency missing value
+            # M_inter_agg[ii_zi, findall(datesHF.==fdatesLF[ii_zi])[1]-n_hfw+1:findall(datesHF.==fdatesLF[ii_zi])[1]] = hfWeights # if shifted above
+            M_inter_agg[ii_zi,ii_M-div((n_hfw-hf_num1),2): ii_M+div((n_hfw-hf_num2),2)]=hfWeights; # +2 and - 2 months for the weights or +3 and -3
+        end
+    end
+
+    return M_inter_agg
+end
+
 
 @doc raw"""
     CPZ_update_cB!()
@@ -351,18 +426,19 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
 
 Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
+Main function
 
 """
-function CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
-    @unpack p, nburn,nsave, const_loc = varSetup
+function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+    @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
     ndraws = nsave+nburn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varList,aggMix)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -374,6 +450,11 @@ function CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
     
     M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
 
+    
+    fdatesHF = timestamp(fdataHF_tab);
+    fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
+    M_inter_agg = CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
+    
     # YY has missing values so we need to draw them once to be able to initialize matrices and prior values
     YYt = BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
     
@@ -406,7 +487,7 @@ function CPZ2023(dataHF_tab,dataLF_tab,varList,varSetup,hypSetup,aggMix)
         end
     end
 
-    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp
+    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, M_inter_agg
 end
 
 
@@ -497,23 +578,62 @@ end
     store_Σt::Array{}        # 
     var_list::Array{}
     freq_mix_tp::Tuple{Int,Int,Int}
+    M_inter_agg::Array{}
 end
 # end of output strcutres
 #------------------------------
 
+
+
+#--------------------------------------
+# Old Forecast Block for CPZ2023
+# @doc raw"""
+#     forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
+
+# Generate a forecast from the output of CPZ2023. The forecast is generated by taking the each draw of the posterior distribution of the missing data and parameters, and then using the VAR coefficients to generate forecasts. 
+# The forecast is generated for `n_fcst` periods, where `n_fcst` is specified in VARSetup. The forecast is generated by taking the last `p` observations of the data (where p is the number of lags in the VAR) and then iterating forward using the VAR coefficients and the forecasted values. The forecast is generated for each draw of the parameters and missing data, and then the median of the forecasts is taken as the final forecast.
+
+# # Arguments
+#     VAROutput::VAROutput_CPZ2023: The output structure from the CPZ2023 model, containing posterior draws of the parameters, missing data, and other relevant matrices.
+#     VARSetup::BVARmodelSetup: The setup structure for the Bayesian VAR model, including the number of forecast periods (`n_fcst`), the number of lags (`p`), and the number of posterior draws to save (`nsave`).
+#     data_struct::BVARmodelDataSetup: The data structure containing the high-frequency data (`dataHF_tab`), variable list (`var_list`), and other relevant information for the model.
+# """
+# function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
+#     @unpack store_β, store_Σt, store_YY = VAROutput
+#     @unpack n_fcst,p,nsave = VARSetup
+
+#     n = size(store_YY,2);
+#     Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
+#     #YY = median(store_YY,dims=3)
+#     # Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
+#     Yfor3D[1:p,:,:] .= @views store_YY[end-p+1:end,:,:];
+
+#     for i_draw = 1:nsave
+#         Yfor3D[1:p,:,i_draw] .= @views store_YY[end-p+1:end,:,i_draw];
+#         # Yfor3D[1:p,:,i_draw] .= @views YY[end-p+1:end,:];
+#         Yfor = @views Yfor3D[:,:,i_draw];
+#         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
+#         Σ_draw = @views store_Σt[:,:,i_draw];
+                
+#         for i_for = 1:n_fcst
+#             tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
+#             tclass = [1;tclass];
+#             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Hermitian(Σ_draw)).U*randn(n,1))';    
+#         end
+#     end
+
+#     fcast_struct = BEAVARs.VARForecast(Yfor3D,data_struct.dataHF_tab,data_struct.var_list,n_fcst)
+    
+#     return fcast_struct
+
+# end # end function fcastCPZ2023()
+
+
+
 #--------------------------------------
 # Forecast Block for CPZ2023
-
 @doc raw"""
-    forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
 
-Generate a forecast from the output of CPZ2023. The forecast is generated by taking the each draw of the posterior distribution of the missing data and parameters, and then using the VAR coefficients to generate forecasts. 
-The forecast is generated for `n_fcst` periods, where `n_fcst` is specified in VARSetup. The forecast is generated by taking the last `p` observations of the data (where p is the number of lags in the VAR) and then iterating forward using the VAR coefficients and the forecasted values. The forecast is generated for each draw of the parameters and missing data, and then the median of the forecasts is taken as the final forecast.
-
-# Arguments
-    VAROutput::VAROutput_CPZ2023: The output structure from the CPZ2023 model, containing posterior draws of the parameters, missing data, and other relevant matrices.
-    VARSetup::BVARmodelSetup: The setup structure for the Bayesian VAR model, including the number of forecast periods (`n_fcst`), the number of lags (`p`), and the number of posterior draws to save (`nsave`).
-    data_struct::BVARmodelDataSetup: The data structure containing the high-frequency data (`dataHF_tab`), variable list (`var_list`), and other relevant information for the model.
 """
 function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     @unpack store_β, store_Σt, store_YY = VAROutput
@@ -544,7 +664,6 @@ function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_str
     return fcast_struct
 
 end # end function fcastCPZ2023()
-
 
 
 ## Model fit block
@@ -578,3 +697,5 @@ function modelFit(out_struct::VAROutput_CPZ2023,varSetup::BEAVARs.VARSetup)
     Yact = @views Y
     return Yfit, Yact
 end
+
+
