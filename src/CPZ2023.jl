@@ -37,7 +37,7 @@ Generate data for a mixed-frequency VAR. Uses Time Arrays from the TimeSeries pa
 See also `dataCPZ2023`.
 
 """
-function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, aggMix::Int; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, aggMix::Int; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
     return dataCPZ2023(dataHF_tab, dataLF_tab, aggMix, var_list)
 end
 
@@ -487,7 +487,7 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
         end
     end
 
-    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, M_inter_agg
+    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, M_inter_agg, fdatesHF, fdatesLF
 end
 
 
@@ -579,6 +579,8 @@ end
     var_list::Array{}
     freq_mix_tp::Tuple{Int,Int,Int}
     M_inter_agg::Array{}
+    fdatesHF::Array{Date, 1}
+    fdatesLF::Array{Date, 1}
 end
 # end of output strcutres
 #------------------------------
@@ -636,31 +638,44 @@ end
 
 """
 function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
-    @unpack store_β, store_Σt, store_YY = VAROutput
+
+    @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
+    @unpack var_list = data_struct
+    YYforHF3d = store_YY;
+    YYforLF3d = mapslices(x->M_inter_agg*x,store_YY,dims=1:2)
 
-    n = size(store_YY,2);
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
-    #YY = median(store_YY,dims=3)
-    # Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
-    Yfor3D[1:p,:,:] .= @views store_YY[end-p+1:end,:,:];
 
-    for i_draw = 1:nsave
-        Yfor3D[1:p,:,i_draw] .= @views store_YY[end-p+1:end,:,i_draw];
-        # Yfor3D[1:p,:,i_draw] .= @views YY[end-p+1:end,:];
-        Yfor = @views Yfor3D[:,:,i_draw];
-        A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
-        Σ_draw = @views store_Σt[:,:,i_draw];
-                
-        for i_for = 1:n_fcst
-            tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
-            tclass = [1;tclass];
-            Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Hermitian(Σ_draw)).U*randn(n,1))';    
-        end
-    end
+    YforLF_low1 = percentile_mat(YYforLF3d,0.05,dims=3);
+    YforLF_low = percentile_mat(YYforLF3d,0.16,dims=3);
+    YforLF_med = percentile_mat(YYforLF3d,0.5,dims=3);
+    YforLF_hih = percentile_mat(YYforLF3d,0.84,dims=3);
+    YforLF_hih1 = percentile_mat(YYforLF3d,0.95,dims=3);
 
-    fcast_struct = BEAVARs.VARForecast(Yfor3D,data_struct.dataHF_tab,data_struct.var_list,n_fcst)
-    
+    YYforLF_low1_tab = rename!(TimeArray(fdatesLF,YforLF_low1),var_list);
+    YYforLF_low_tab = rename!(TimeArray(fdatesLF,YforLF_low),var_list);
+    YYforLF_med_tab = rename!(TimeArray(fdatesLF,YforLF_med),var_list);
+    YYforLF_hih_tab = rename!(TimeArray(fdatesLF,YforLF_hih),var_list);
+    YYforLF_hih1_tab = rename!(TimeArray(fdatesLF,YforLF_hih1),var_list);
+
+    YYforLF_struct = BEAVARs.data_fcast_PI(YYforLF_low1_tab, YYforLF_low_tab, YYforLF_med_tab, YYforLF_hih_tab, YYforLF_hih1_tab);
+
+    YforHF_low1 = percentile_mat(YYforHF3d,0.05,dims=3);
+    YforHF_low = percentile_mat(YYforHF3d,0.16,dims=3);
+    YforHF_med = percentile_mat(YYforHF3d,0.5,dims=3);
+    YforHF_hih = percentile_mat(YYforHF3d,0.84,dims=3);
+    YforHF_hih1 = percentile_mat(YYforHF3d,0.95,dims=3);
+
+    YYforHF_low1_tab = rename!(TimeArray(fdatesHF,YforHF_low1),var_list);
+    YYforHF_low_tab = rename!(TimeArray(fdatesHF,YforHF_low),var_list);
+    YYforHF_med_tab = rename!(TimeArray(fdatesHF,YforHF_med),var_list);
+    YYforHF_hih_tab = rename!(TimeArray(fdatesHF,YforHF_hih),var_list);
+    YYforHF_hih1_tab = rename!(TimeArray(fdatesHF,YforHF_hih1),var_list);
+
+    YYforHF_struct = BEAVARs.data_fcast_PI(YYforHF_low1_tab, YYforHF_low_tab, YYforHF_med_tab, YYforHF_hih_tab, YYforHF_hih1_tab);
+
+    fcast_struct = BEAVARs.VAR_MF_Forecast(YYforHF3d,YYforLF3d,data_struct.dataHF_tab,data_struct.dataLF_tab,var_list,n_fcst,YYforHF_struct,YYforLF_struct)    
+
     return fcast_struct
 
 end # end function fcastCPZ2023()

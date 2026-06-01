@@ -92,6 +92,15 @@ end
     var_list::Array{Symbol,1}                                          # Symbol vector with the variable names, will be used for ordering
 end
 
+# Structure to hold the median, 68% and 95% percentiles of the forecasts for a VAR
+@with_kw struct data_fcast_PI <: BVARmodelDataSetup
+    YYfor_low1_tab::TimeArray         
+    YYfor_low_tab::TimeArray         
+    YYfor_med_tab::TimeArray         
+    YYfor_hih_tab::TimeArray
+    YYfor_hih1_tab::TimeArray
+end
+
 @with_kw struct VARSetup <: BVARmodelSetup
     p::Int          # number of lags
     nsave::Int      # gibbs to save
@@ -103,7 +112,7 @@ end
 
 # types for forecast output export
 @with_kw struct VARForecast <: BVARforecastOutput
-    Yfor3D::Array{}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
+    Yfor3d::Array{}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
     data_tab::TimeArray        # dataset in a TimeArray format   
     var_list::Array{Symbol,1}  # variable names for the forecasts
     n_fcst::Int                # number of forecast periods
@@ -112,12 +121,14 @@ end
 
 # types for forecast output export
 @with_kw struct VAR_MF_Forecast <: BVARforecastOutput
-    YforHF3D::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x nsave
-    YforLF3D::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x nsave
+    YforHF3d::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x nsave
+    YforLF3d::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x nsave
     dataHF_tab::TimeArray      # High frequency dataset in a TimeArray format   
     dataLF_tab::TimeArray      # Low frequency dataset in a TimeArray format 
     var_list::Array{Symbol,1}  # variable names for the forecasts
     n_fcst::Int                # number of forecast periods of the low-frequency variable
+    YYforHF_struct::BVARmodelDataSetup     # structure with the percentiles of the forecasts for the high-frequency variables
+    YYforLF_struct::BVARmodelDataSetup     # structure with the percentiles of the forecasts for the low-frequency variables
 end
 
 
@@ -236,8 +247,8 @@ end
 function beavar(::CPZ2023_type, set_struct, hyp_struct, data_struct)
     println("Hello CPZ2023")
     @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_struct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
-    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY,M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg);
+    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
+    out_struct = VAROutput_CPZ2023(store_β::Array{},store_Σt_inv,store_YY::Array{}, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
     return out_struct
 end
 
