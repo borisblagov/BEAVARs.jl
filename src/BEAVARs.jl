@@ -248,7 +248,7 @@ function beavar(::CPZ2023_type, set_struct, hyp_struct, data_struct)
     println("Hello CPZ2023")
     @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_struct
     store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
-    out_struct = VAROutput_CPZ2023(store_β::Array{},store_Σt_inv,store_YY::Array{}, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
+    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
     return out_struct
 end
 

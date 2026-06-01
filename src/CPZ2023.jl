@@ -314,8 +314,8 @@ function CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p)
     S_full = I(Tf*n);
     Sm = S_full[:,indL_nan_wide]; # Sm, selection matrix selecting the missing values
     So = S_full[:,indL_non_wide]; # So, selection matrix selecting hte observed values
-    Smsp = sparse(Sm);            # sparse Sm
-    Sosp = sparse(So);            # sparse So
+    Smsp = Sm;            # sparse Sm
+    Sosp = So;            # sparse So
     
     # Initialize matrices
     H_Bsp, strctBdraw_LI = BEAVARs.makeBlkDiag(Tfn,n,p, -structB_draw);
@@ -453,7 +453,7 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
     
     fdatesHF = timestamp(fdataHF_tab);
     fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
-    M_inter_agg = CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
+    M_inter_agg = BEAVARs.CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
     
     # YY has missing values so we need to draw them once to be able to initialize matrices and prior values
     YYt = BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
@@ -489,6 +489,34 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
 
     return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, M_inter_agg, fdatesHF, fdatesLF
 end
+
+
+@doc raw"""
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+
+Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
+
+Main function
+
+"""
+function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+    @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
+    ndraws = nsave+nburn;
+    nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
+
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
+
+    YYwNA = values(fdataHF_tab);
+    YY = deepcopy(YYwNA);
+    Tf,n = size(YY);
+    
+    B_draw, structB_draw, Σt_inv, b0 = BEAVARs.initParamMatrices(n,p,const_loc) 
+
+    YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_invsp, Σt_LI, Σp_invsp, Σpt_ind, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym = BEAVARs.CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p);
+    
+
+end
+
 
 
 function CPZ2023n(YYwNA, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames,varSetup,hypSetup)
