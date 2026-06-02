@@ -4,14 +4,14 @@ end
 
 # Structure for the datasets and the frequency mix
 @doc raw"""
-    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,aggMix::Int,var_list::Array{Symbol,1})
+    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,data_trans::Int,var_list::Array{Symbol,1})
 
 Generate a dataset strcture for use with CPZ2023 model
 
 # Arguments
     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    aggMix:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
+    data_trans:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
 
 See also `makeDataSetup`.
@@ -19,41 +19,41 @@ See also `makeDataSetup`.
 @with_kw struct dataCPZ2023 <: BVARmodelDataSetup
     dataHF_tab::TimeArray                                       # data for the high-frequency variables
     dataLF_tab::TimeArray                                       # data for the low-frequency variables
-    aggMix::Int                                                 # 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
+    data_trans::Int                                                 # 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
     var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
 end
 
 @doc raw"""
-    makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, aggMix::Int; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+    makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, data_trans::Int; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
 
 Generate data for a mixed-frequency VAR. Uses Time Arrays from the TimeSeries package
     
 # Arguments
     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    aggMix:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
+    data_trans:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
 
 See also `dataCPZ2023`.
 
 """
-function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, aggMix::Int; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
-    return dataCPZ2023(dataHF_tab, dataLF_tab, aggMix, var_list)
+function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, data_trans::Int; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
+    return dataCPZ2023(dataHF_tab, dataLF_tab, data_trans, var_list)
 end
 
 
 
 @doc raw"""
-    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)    
+    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)    
 
     Prepare one large table with the full dataset  `fataHF_tab` with both low and high-frequency variables with low-freq having `NaNs`. 
     It will extend the table with n_fcst, which is the amoung of *low frequency* time periods.
 
     varOrder must be a `Vector{Symbol}` and not `Vector{Vector{Symbol}}`
     e.g. [varNamesLF; varNamesHF] and not [varNamesLF, varNamesHF]
-    aggMix = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
+    data_trans = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
 """
-function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
+function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
     varNamesLF = colnames(dataLF_tab)
     # z_tab = dataLF_tab[.!isnan.(dataLF_tab)];
     z_tab = dataLF_tab;
@@ -70,7 +70,7 @@ function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
         freqL_date = Month(12)
     end 
     # tuple showing the specification: 1, 3, 12 are monthly quarterly, annually and 0,1 is growth rates or log-levels
-    freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),aggMix) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
+    freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),data_trans) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
 
         
     # add the forecast periods to the data
@@ -397,18 +397,18 @@ end
 @doc raw"""
     Updates parameters using an independennt Normal-Wishart prior
 """
-function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,intercept,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,upd_these_vec,K_β,beta)
+function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,intercept,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,upd_these_vec,K_β,beta,data_trans)
     Y, X = mlagL!(YY,Y,X,p,n)
     (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,upd_these_vec);
     S_0 = Diagonal(sigmaP);
     beta_Minn = zeros(n^2*p+n);
-    idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup);
+    idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup,data_trans);
     V_Minn_vec_inv = 1.0./V_Minn_vec;
     Σp_invsp.nzval[:] = Σt_inv[Σpt_ind];    
     Xsur_den[Xsur_CI] = X[X_CI]; 
     V_Minn_inv_elview[:] = V_Minn_vec_inv;  # update the diagonal of V_Minn_inv, i.e. V_Minn^-1
 
-    beta = BEAVARs.Chan2020_drawβ(Σp_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,beta_Minn,K_β,Y,n,k);
+    beta[:] = BEAVARs.Chan2020_drawβ(Σp_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,beta_Minn,K_β,Y,n,k);
     
 
     B_draw[:,:] = reshape(beta,k,n)'
@@ -426,19 +426,19 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
 
 Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
 Main function
 
 """
-function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
     @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
     ndraws = nsave+nburn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -477,7 +477,7 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
         BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
         
         # draw of the parameters
-        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta);
+        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta,data_trans);
 
         if ii>nburn
             store_β[:,ii-nburn]  = beta;
@@ -492,19 +492,19 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
 
 Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
 Main function
 
 """
-function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,aggMix)
+function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
     @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
     ndraws = nsave+nburn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,aggMix,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -587,7 +587,7 @@ function CPZ_initMinn(YY,p)
     XtΣ_inv_X                   = zeros(n*k,n*k);                           # this is X' ( I(T) ⊗ Σ-1 ) X from page 6 in Chan 2020 LBA    
     Xsur_den, Xsur_CI, X_CI     = BEAVARs.SUR_form_dense(X,n);              # prepares the SUR form and the indices of the parameters for updating
     K_β                         = zeros(n*k,n*k);                           # Variance covariance matrix of the parameters
-    beta                        = zeros(n*k,);                              # the parameters in a vector
+    beta                        = zeros(n*k,);                              # will house the Minnesota parameters vector
 
     return Y, X, T, deltaP, sigmaP, mu_prior, V_Minn_inv, V_Minn_inv_elview, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept
 end

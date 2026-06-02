@@ -47,21 +47,23 @@ The function implements the homoscedastic Minnesota prior with a SUR form as in 
 Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, https://doi.org/10.1007/978-3-030-31150-6 and https://joshuachan.org/papers/large_BVAR.pdf.
 """
 function Chan2020minn(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
-    @unpack p,nburn,nsave = VARSetup
+    @unpack p,nburn,nsave,prior_RW = VARSetup
     
-    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, βminn, intercept = BEAVARs.initMinn(YY,p);
+    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
-    (idx_kappa1,idx_kappa2, Vβ_vec) = BEAVARs.prior_Minn(n,p,sigmaP,hypSetup)
+    (idx_kappa1,idx_kappa2, Vβ_vec, βMinn) = BEAVARs.prior_Minn(n,p,sigmaP,hypSetup,prior_RW)
 
     Vβ_inv_vecView[:] = 1.0./Vβ_vec;                # update the diagonal of Vβ_inv
     Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
     mul!(XtΣ_inv_den,Xsur_den',Σ_invsp);            #  X'*( I(T) ⊗ Σ^{-1} )
     mul!(XtΣ_inv_X,XtΣ_inv_den,Xsur_den);           #  X'*( I(T) ⊗ Σ^{-1} )*X
     K_β[:,:] .= Vβ_inv .+ XtΣ_inv_X;                #  K_β = V^{-1} + X'*( I(T) ⊗ Σ^{-1} )*X
-    prior_mean = Vβ_inv*βminn;                      #  V^-1 * βminn 
-    mul!(prior_mean,XtΣ_inv_den, vec(Y'),1.0,1.0);  # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
+    prior_ = Vβ_inv*βMinn;                          #  V^-1 * βMinn 
+    println(prior_)
+    mul!(prior_,XtΣ_inv_den, vec(Y'),1.0,1.0);      # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
+    println(prior_)
     cholK_β = cholesky(Hermitian(K_β));             # Cholesky factor
-    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_mean));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
     
 
     ndraws = nsave+nburn;

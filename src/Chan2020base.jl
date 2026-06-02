@@ -238,7 +238,7 @@ end
 
 
 @doc raw"""
-    (idx_kappa1,idx_kappa2, C) = prior_Minn(n,p,sigmaP,hypSetup)
+    (idx_kappa1,idx_kappa2, C, βMinn) = prior_Minn(n,p,sigmaP,hypSetup;data_trans)
 
 Impements a Minnesota prior with scaling for the off-diagonal elements as in Chan, J.C.C. (2020). Large Bayesian Vector Autoregressions. In: P. Fuleky (Eds),
 Macroeconomic Forecasting in the Era of Big Data, 95-125, Springer, Cham. If you remove the hyperparameters ``c_1``, ``c_2``, ``c_3`` (or set them equal to 1),
@@ -260,11 +260,11 @@ The hyperparameters have default values of ``c_1 = 0.04``; ``c_2 = 0.01``; ``c_3
 are referred to as ``\kappa_1``, ``\kappa_2``, and ``\kappa_4`` (``\kappa_3`` is used there for prior on contemporaneous relationships)
 
 """
-function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)    
+function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{},hypSetup::BVARmodelHypSetup,data_trans::Integer)    
     @unpack c1,c2,c3 = hypSetup
     C = zeros(n^2*p+n,);
-    # beta_Minn = zeros(n^2*p+n);
-    np1 = n*p+1 # number of parameters per equation
+    βMinn = zeros(n^2*p+n);                         # initialize the prior mean for growth rates, e.g. center at 0
+    np1 = n*p+1                                     # number of parameters per equation
     idx_kappa1 =  Vector{Int}()
     idx_kappa2 =  Vector{Int}()
     idx_count = 1    
@@ -272,14 +272,17 @@ function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)
 
     for ii = 1:n
       for j = 1:n*p+1       # for j=1:n*p+1 
-        l = ceil((j-1)/n)       # Here we need a float, as afterwards we will divide by l 
-        idx = mod(j-1,n);       # this will count if its own lag, non-own lag, or constant
+        l = ceil((j-1)/n)           # Here we need a float, as afterwards we will divide by l 
+        idx = mod(j-1,n);           # this will count if its own lag, non-own lag, or constant
         if idx==0
             idx = n;
         end
-        if j == 1
+        if j == 1                   # Constant is the first element in each equation
             Ci[j] = c3;
-        elseif idx == ii
+        elseif idx == ii            # These are the own lags of the variable
+            if l == 1 && data_trans == 1              # If we have levels instead of growth rates we add a "1" for the first lag
+                βMinn[idx_count,] = 1;
+            end
             Ci[j] = c1/l^2;
             push!(idx_kappa1,idx_count)
         else
@@ -292,13 +295,13 @@ function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)
     C[(ii-1)*np1+1:ii*np1] = Ci
 
     end
-    return idx_kappa1,idx_kappa2, C
+    return idx_kappa1,idx_kappa2, C, βMinn
 
 end
 
 
 @doc raw"""
-    (idx_kappa1,idx_kappa2, C, beta_Minn) = prior_NonConj(n,p,sigmaP,hyp)
+    (idx_kappa1,idx_kappa2, C, beta_Minn) = prior_NatConj(n,p,sigmaP,hyp)
 
 Imlpements a Minnesota prior for a non-conjugate case as in Chan, J.C.C. (2020). Large Bayesian Vector Autoregressions. In: P. Fuleky (Eds),
 Macroeconomic Forecasting in the Era of Big Data, 95-125, Springer, Cham.
@@ -316,15 +319,14 @@ C_{n*p+1 \times 1} =
 Note that C is now (n*p+1 x 1) and not n^2*p+n as [`prior_Minn(x)`](@ref)
 
 """
-function prior_NonConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)    
+function prior_NatConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)    
     @unpack c1,c3 = hypSetup;
-    C = zeros(n^2*p+n,);
-    beta_Minn = zeros(n^2*p+n);
     np1 = n*p+1 # number of parameters per equation
+    # TODO these indices here idx_kappa1 and idx_kappa2 are wrong! idx_kappa1 is not the own lags but all except the constant. Also, C is not C but V_minn because it already incorporates sigmaP
     idx_kappa1 =  Vector{Int}()
     idx_kappa2 =  Vector{Int}()
     idx_count = 1    
-    C = zeros(np1,)     # vector for equation i
+    V_A0 = zeros(np1,)     # vector for equation i
 
 
     for j = 1:n*p+1       # for j=1:n*p+1 
@@ -334,20 +336,20 @@ function prior_NonConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetu
             idx = n;
         end
         if j == 1
-            C[j] = c3;
+            V_A0[j] = c3;
         else
-            C[j] = c1/(l^2*sigmaP_vec[idx]);
+            V_A0[j] = c1/((l^2)*sigmaP_vec[idx]);
             push!(idx_kappa1,idx_count)
         end
     end
-    return idx_kappa1,idx_kappa2, C, beta_Minn
+    return idx_kappa1,idx_kappa2, V_A0
 
 end
 
 
 
 @doc raw"""
-    BEAVARs.initMinn(YY, p)
+    BEAVARs.init_Minn(YY, p)
 
     Initializes necessary matrices for a Minnesota prior following Chan (2020).
 
@@ -374,13 +376,13 @@ end
 - `X_CI::Vector{CartesianIndex}`:   Cartesian indices mapping elements of `X` to `Xsur_den`.
 - `k::Int`:                         The total number of regression coefficients, calculated as `n * p + intercept`.
 - `K_β::Matrix{Float64}`:           The variance-covariance matrix of the regression coefficients.
-- `beta::Vector{Float64}`:          A vector of regression coefficients, initialized to zeros.
+- `βminn::Vector{Float64}`:         Will collect the prior mean in a vector.
 - `intercept::Int`:                 A flag indicating where the intercept is.
 """
-function initMinn(YY,p)
+function init_Minn(YY,p)
     Y, X, T, n, intercept       = mlagL(YY,p);
     k                           = n*p+intercept
-    sigmaP                      = ar4!(YY,zeros(n,));                       # do OLS to initialize priors
+    sigmaP, betOLS              = ar4(YY);                       # do OLS to initialize priors
     S_0                         = Diagonal(sigmaP);              
     Σt_inv                      = S_0\I;                                    # initialize Σ^-1              
     Vβ_inv                      = 1.0*Matrix(I,n*k,n*k);                    # prior matrix
@@ -390,7 +392,7 @@ function initMinn(YY,p)
     XtΣ_inv_X                   = zeros(n*k,n*k);                           # will be X' ( I(T) ⊗ Σ-1 ) X from page 6 in Chan 2020 LBA    
     Xsur_den, Xsur_CI, X_CI     = BEAVARs.SUR_form_dense(X,n);              # prepares the SUR form and the indices of the parameters for updating
     K_β                         = zeros(n*k,n*k);                           # Variance covariance matrix of the parameters
-    beta                        = zeros(n*k,);                              # the parameters in a vector
+    beta                       = zeros(n*k,);                               # the parameters in a vector
     
-    return Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept
+    return Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS
 end

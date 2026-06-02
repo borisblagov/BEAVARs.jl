@@ -16,12 +16,12 @@ end
 
 
 function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
-    @unpack p,nburn,nsave = VARSetup
+    @unpack p,nburn,nsave, prior_RW = VARSetup
     ndraws  = nsave+nburn;
 
-    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβminn_inv, Vβminn_inv_elview, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, βminn, intercept = BEAVARs.initMinn(YY,p);
+    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβminn_inv, Vβminn_inv_elview, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
-    (idx_kappa1,idx_kappa2, Vβminn) = prior_Minn(n,p,sigmaP,hypSetup)
+    (idx_kappa1,idx_kappa2, Vβminn, βMinn) = prior_Minn(n,p,sigmaP,hypSetup,prior_RW)
 
     Vβminn_inv_elview[:] = 1.0./Vβminn;             # update the diagonal of Vβminn_inv
     Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
@@ -30,7 +30,7 @@ function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     store_β = zeros(n^2*p+n,nsave);
     store_Σt = zeros(n,n,nsave);
     for ii = 1:ndraws 
-        beta = BEAVARs.Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,βminn,K_β,Y,n,k);
+        beta = BEAVARs.Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,βMinn,K_β,Y,n,k);
         Σt, Σt_inv = Chan2020_drawΣt(Y,Xsur_den,beta,n,T,S_0,hypSetup.nu0);
 
         Σ_invsp.nzval[:] = Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )

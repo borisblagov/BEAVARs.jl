@@ -108,6 +108,7 @@ end
     n_irf::Int      # number of impulse responses
     n_fcst::Int     # number of forecast periods
     const_loc::Int  # location of the constant
+    prior_RW::Int   # 1 for random walk prior (Y = B1*Y_tm1 + .... with B1 being identity matrix), or 0 for B1 = zeros(n,n), #TODO add for OLS (persistent), #TODO add for mix
 end
 
 # types for forecast output export
@@ -153,7 +154,7 @@ Only the first argument is mandatory, rest is optional with default values.
 
 See also [`hypChan2020`](@ref), [`hypBGR2010`](@ref).
 """
-function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct())
+function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct(),prior_RW::Int = 0)
     model_type = BEAVARs.selectModel(model_str)
     # checking if user supplied the hyperparameter structure
     if isa(hyp,hypDefault_struct)                        # if not supplied, make a default one
@@ -164,7 +165,7 @@ function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,
 
     intercept = BEAVARs.selectConstLoc(model_str);
     
-    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept);
+    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept,prior_RW);
     return model_type, set_struct, hyp_struct
 end
 
@@ -217,39 +218,39 @@ include("plot_functions.jl")
 # The Den: this is where the beavars live
 #-------------------------------------
 
-function beavar(::Chan2020minn_type, set_struct, hyper_str, data_struct)
+function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     println("Hello Minn")
     YY = values(data_struct.data_tab);
-    store_β, store_Σ = Chan2020minn(YY,set_struct,hyper_str);
+    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY)
     return out_struct
 end
 
+function beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
+    println("Hello Independent Normal Inverse Wishart")
+    YY = values(data_struct.data_tab);
+    store_β, store_Σ = Chan2020iniw(YY,set_struct,hyp_str);
+    out_struct = VAROutput_Chan2020iniw(store_β,store_Σ,YY)
+    return out_struct
+end
 
 
 @doc raw"""
     Main function for Chan2020csv
 """
-function beavar(::Chan2020csv_type, set_struct, hyper_str, data_struct)
+function beavar(::Chan2020csv_type, set_struct, hyp_str, data_struct)
+    println("Hello Minn CSV")
     YY = values(data_struct.data_tab);
-    store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyper_str);
+    store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020csv(store_β,store_Σ,store_h,s2_h_store, store_ρ, store_σ_h2, store_eh,YY)
-    return out_struct
-end
-
-function beavar(::Chan2020iniw_type, set_struct, hyper_str, data_struct)
-    println("Hello Independent Normal Inverse Wishart")
-    YY = values(data_struct.data_tab);
-    store_β, store_Σ = Chan2020iniw(YY,set_struct,hyper_str);
-    out_struct = VAROutput_Chan2020iniw(store_β,store_Σ,YY)
     return out_struct
 end
 
 
 function beavar(::CPZ2023_type, set_struct, hyp_struct, data_struct)
     println("Hello CPZ2023")
-    @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_struct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix);
+    @unpack dataHF_tab,dataLF_tab, prior_RW, var_list = data_struct
+    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,prior_RW);
     out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
     return out_struct
 end
@@ -260,8 +261,8 @@ end
 """
 function beavar(::Blagov2025_type, set_struct, hyp_struct, data_struct)
     println("Hello Blagov2025")
-    @unpack dataHF_tab,dataLF_tab, aggMix, var_list = data_struct
-    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,aggMix)    
+    @unpack dataHF_tab,dataLF_tab, prior_RW, var_list = data_struct
+    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,prior_RW)    
     out_struct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh)
     return out_struct
 end

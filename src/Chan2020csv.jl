@@ -26,16 +26,19 @@ Implements the BVAR with Minnesota prior with a SUR form and common stochastic v
 """
 function Chan2020csv(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-    @unpack p, nsave, nburn = VARSetup
+    @unpack p, nsave, nburn, prior_RW = VARSetup
 
     Y, X, T, n = mlagL(YY,p)
     (deltaP, sigmaP, mu_prior) = trainPriors(YY,p)
     np1 = n*p+1; # number of parameters per equation
-    (idx_kappa1,idx_kappa2, V_Minn, beta_Minn) = prior_NonConj(n,p,sigmaP,hypSetup);
+    (idx_kappa1,idx_kappa2, V_Minn) = prior_NatConj(n,p,sigmaP,hypSetup);
     
-    A_0 = reshape(beta_Minn,np1,n);
+
+    A_0 = zeros(n*p+1,n)
+    if prior_RW == 1
+        A_0[2:n+1,1:n] = Matrix(1.0I, n, n)     # account for the constant on the top row
+    end
     V_Ainv = sparse(1:np1,1:np1,1.0./V_Minn)
-    
     S_0 = Diagonal(sigmaP);
     Σ = S_0;
     v_0 = n+3;
@@ -307,14 +310,18 @@ end # end function forecast Chan2020csv()
 """
     
 """
-function initcsv(YY,p,hypSetup)
+function initcsv(YY,p,hypSetup,prior_RW)
     Y, X, T, n, intercept       = mlagL(YY,p);
     k                           = n*p+intercept
     sigmaP                      = ar4!(YY,zeros(n,));  # do OLS to initialize priors
     S_0                         = Diagonal(sigmaP);
     Σ = Matrix(S_0);              
-    (idx_kappa1,idx_kappa2, V_Minn, beta_Minn) = prior_NonConj(n,p,sigmaP,hypSetup);
-    A_0     = reshape(beta_Minn,k,n);
+    (idx_kappa1,idx_kappa2, V_Minn, β_Minn) = prior_NatConj(n,p,sigmaP,hypSetup);
+    A_0     = reshape(β_Minn,k,n);
+    
+    if prior_RW == 1
+        A_0[2:n+1,1:n] = Matrix(1.0I, n, n)     # account for the constant on the top row
+    end
     V_Ainv  = sparse(1:k,1:k,1.0./V_Minn);
     VAinvDA0 = V_Ainv\A_0;
     AVAinvA = A_0'*V_Ainv*A_0;   # this will not change unless we update the prior
@@ -364,9 +371,9 @@ Implements the BVAR with Minnesota prior with a SUR form and common stochastic v
 """
 function Chan2020csv2(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-    @unpack p, nsave, nburn = VARSetup
+    @unpack p, nsave, nburn, prior_RW = VARSetup
     
-    Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA = BEAVARs.initcsv(YY,p,hypSetup);
+    Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA = BEAVARs.initcsv(YY,p,hypSetup,prior_RW);
     # This part follows page 19 of Chan, J. (2020)
     ndraws = nsave+nburn;
     store_β = zeros(k*n,nsave);

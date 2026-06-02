@@ -179,7 +179,7 @@ function ar1(YY::Matrix{Float64},sig::Vector{Float64})
     return sig
 end
 
-function ar4!(YY::Matrix{Float64},sig::Vector{Float64})
+function ar4!(YY::Matrix{Float64},sig::Vector{})
     n = size(YY,2);
     T_y = size(YY,1)-4;
     x4 = ones(T_y,5);
@@ -194,6 +194,26 @@ function ar4!(YY::Matrix{Float64},sig::Vector{Float64})
         sig[ii] = dot(res',res)/T_y     # Note that T_y is T-4 where T is lenght(YY)
     end
     return sig
+end
+
+
+function ar4(YY::Array)
+    n = size(YY,2);
+    T_y = size(YY,1)-4;
+    x4 = ones(T_y,5);
+    sig4 = zeros(n,)
+    bet4 = zeros(n,5);
+    for ii = 1:n
+        y = @view YY[5:end,ii];
+        x4[:,5] = @view YY[1:end-4,ii];
+        x4[:,4] = @view YY[2:end-3,ii];
+        x4[:,3] = @view YY[3:end-2,ii];
+        x4[:,2] = @view YY[4:end-1,ii];
+        bet4[ii,:] = x4\y;
+        res = y-x4*bet4[ii,:];
+        sig4[ii] = dot(res',res)/T_y     # Note that T_y is T-4 where T is lenght(YY)
+    end
+    return sig4,bet4
 end
 
 
