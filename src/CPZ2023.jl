@@ -4,14 +4,13 @@ end
 
 # Structure for the datasets and the frequency mix
 @doc raw"""
-    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,data_trans::Int,var_list::Array{Symbol,1})
+    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,var_list::Array{Symbol,1})
 
 Generate a dataset strcture for use with CPZ2023 model
 
 # Arguments
     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    data_trans:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
 
 See also `makeDataSetup`.
@@ -19,41 +18,39 @@ See also `makeDataSetup`.
 @with_kw struct dataCPZ2023 <: BVARmodelDataSetup
     dataHF_tab::TimeArray                                       # data for the high-frequency variables
     dataLF_tab::TimeArray                                       # data for the low-frequency variables
-    data_trans::Int                                                 # 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
     var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
 end
 
 @doc raw"""
-    makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, data_trans::Int; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+    makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
 
 Generate data for a mixed-frequency VAR. Uses Time Arrays from the TimeSeries package
     
 # Arguments
     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    data_trans:     0 for data in growth rates, 1 for log-levels. Determines the weights how high freq. variables fit with low-frequency ones. Will use averages for log-levels or Mariano and Murasawa (2010) weights for growth rates 
     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
 
 See also `dataCPZ2023`.
 
 """
-function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, data_trans::Int; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
-    return dataCPZ2023(dataHF_tab, dataLF_tab, data_trans, var_list)
+function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
+    return dataCPZ2023(dataHF_tab, dataLF_tab, var_list)
 end
 
 
 
 @doc raw"""
-    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)    
+    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)    
 
     Prepare one large table with the full dataset  `fataHF_tab` with both low and high-frequency variables with low-freq having `NaNs`. 
     It will extend the table with n_fcst, which is the amoung of *low frequency* time periods.
 
     varOrder must be a `Vector{Symbol}` and not `Vector{Vector{Symbol}}`
     e.g. [varNamesLF; varNamesHF] and not [varNamesLF, varNamesHF]
-    data_trans = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
+    prior_RW = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
 """
-function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
+function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     varNamesLF = colnames(dataLF_tab)
     # z_tab = dataLF_tab[.!isnan.(dataLF_tab)];
     z_tab = dataLF_tab;
@@ -70,7 +67,7 @@ function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
         freqL_date = Month(12)
     end 
     # tuple showing the specification: 1, 3, 12 are monthly quarterly, annually and 0,1 is growth rates or log-levels
-    freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),data_trans) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
+    freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),prior_RW) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
 
         
     # add the forecast periods to the data
@@ -397,12 +394,12 @@ end
 @doc raw"""
     Updates parameters using an independennt Normal-Wishart prior
 """
-function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,intercept,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,upd_these_vec,K_β,beta,data_trans)
+function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,intercept,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,upd_these_vec,K_β,beta,prior_RW)
     Y, X = mlagL!(YY,Y,X,p,n)
     (deltaP, sigmaP, mu_prior) = BEAVARs.updatePriors_bitVec!(Y,X,n,mu_prior,deltaP,sigmaP,intercept,upd_these_vec);
     S_0 = Diagonal(sigmaP);
     beta_Minn = zeros(n^2*p+n);
-    idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup,data_trans);
+    idx_kappa1,idx_kappa2, V_Minn_vec = prior_Minn(n,p,sigmaP,hypSetup,prior_RW);
     V_Minn_vec_inv = 1.0./V_Minn_vec;
     Σp_invsp.nzval[:] = Σt_inv[Σpt_ind];    
     Xsur_den[Xsur_CI] = X[X_CI]; 
@@ -426,19 +423,19 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
 
 Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
 Main function
 
 """
-function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
-    @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
+function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
+    @unpack p, nburn,nsave, const_loc, n_fcst, prior_RW = varSetup
     ndraws = nsave+nburn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -477,7 +474,7 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
         BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
         
         # draw of the parameters
-        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta,data_trans);
+        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta,prior_RW);
 
         if ii>nburn
             store_β[:,ii-nburn]  = beta;
@@ -492,19 +489,19 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
+    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
 
 Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
 Main function
 
 """
-function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup,data_trans)
+function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
     @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
     ndraws = nsave+nburn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,data_trans,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -612,51 +609,6 @@ end
 end
 # end of output strcutres
 #------------------------------
-
-
-
-#--------------------------------------
-# Old Forecast Block for CPZ2023
-# @doc raw"""
-#     forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
-
-# Generate a forecast from the output of CPZ2023. The forecast is generated by taking the each draw of the posterior distribution of the missing data and parameters, and then using the VAR coefficients to generate forecasts. 
-# The forecast is generated for `n_fcst` periods, where `n_fcst` is specified in VARSetup. The forecast is generated by taking the last `p` observations of the data (where p is the number of lags in the VAR) and then iterating forward using the VAR coefficients and the forecasted values. The forecast is generated for each draw of the parameters and missing data, and then the median of the forecasts is taken as the final forecast.
-
-# # Arguments
-#     VAROutput::VAROutput_CPZ2023: The output structure from the CPZ2023 model, containing posterior draws of the parameters, missing data, and other relevant matrices.
-#     VARSetup::BVARmodelSetup: The setup structure for the Bayesian VAR model, including the number of forecast periods (`n_fcst`), the number of lags (`p`), and the number of posterior draws to save (`nsave`).
-#     data_struct::BVARmodelDataSetup: The data structure containing the high-frequency data (`dataHF_tab`), variable list (`var_list`), and other relevant information for the model.
-# """
-# function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
-#     @unpack store_β, store_Σt, store_YY = VAROutput
-#     @unpack n_fcst,p,nsave = VARSetup
-
-#     n = size(store_YY,2);
-#     Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
-#     #YY = median(store_YY,dims=3)
-#     # Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
-#     Yfor3D[1:p,:,:] .= @views store_YY[end-p+1:end,:,:];
-
-#     for i_draw = 1:nsave
-#         Yfor3D[1:p,:,i_draw] .= @views store_YY[end-p+1:end,:,i_draw];
-#         # Yfor3D[1:p,:,i_draw] .= @views YY[end-p+1:end,:];
-#         Yfor = @views Yfor3D[:,:,i_draw];
-#         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
-#         Σ_draw = @views store_Σt[:,:,i_draw];
-                
-#         for i_for = 1:n_fcst
-#             tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
-#             tclass = [1;tclass];
-#             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Hermitian(Σ_draw)).U*randn(n,1))';    
-#         end
-#     end
-
-#     fcast_struct = BEAVARs.VARForecast(Yfor3D,data_struct.dataHF_tab,data_struct.var_list,n_fcst)
-    
-#     return fcast_struct
-
-# end # end function fcastCPZ2023()
 
 
 

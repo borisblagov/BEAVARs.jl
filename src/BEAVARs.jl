@@ -43,7 +43,7 @@ struct Chan2020minn_type <: BVARmodelType end
 struct Chan2020iniw_type <: BVARmodelType end
 struct Chan2020iniw_type2 <: BVARmodelType end
 struct Chan2020csv_type <: BVARmodelType end
-struct Chan2020csv_type2 <: BVARmodelType end
+# struct Chan2020csv_type2 <: BVARmodelType end
 struct BGR2010_type <: BVARmodelType end
 struct CPZ2023_type <: BVARmodelType end
 struct Blagov2025_type <: BVARmodelType end
@@ -249,8 +249,8 @@ end
 
 function beavar(::CPZ2023_type, set_struct, hyp_struct, data_struct)
     println("Hello CPZ2023")
-    @unpack dataHF_tab,dataLF_tab, prior_RW, var_list = data_struct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,prior_RW);
+    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
     out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
     return out_struct
 end
@@ -261,9 +261,9 @@ end
 """
 function beavar(::Blagov2025_type, set_struct, hyp_struct, data_struct)
     println("Hello Blagov2025")
-    @unpack dataHF_tab,dataLF_tab, prior_RW, var_list = data_struct
-    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct,prior_RW)    
-    out_struct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh)
+    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
+    out_struct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF)
     return out_struct
 end
 

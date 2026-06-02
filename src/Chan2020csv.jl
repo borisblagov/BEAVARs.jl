@@ -307,39 +307,6 @@ end # end function forecast Chan2020csv()
 
 
 
-"""
-    
-"""
-function initcsv(YY,p,hypSetup,prior_RW)
-    Y, X, T, n, intercept       = mlagL(YY,p);
-    k                           = n*p+intercept
-    sigmaP                      = ar4!(YY,zeros(n,));  # do OLS to initialize priors
-    S_0                         = Diagonal(sigmaP);
-    Σ = Matrix(S_0);              
-    (idx_kappa1,idx_kappa2, V_Minn, β_Minn) = prior_NatConj(n,p,sigmaP,hypSetup);
-    A_0     = reshape(β_Minn,k,n);
-    
-    if prior_RW == 1
-        A_0[2:n+1,1:n] = Matrix(1.0I, n, n)     # account for the constant on the top row
-    end
-    V_Ainv  = sparse(1:k,1:k,1.0./V_Minn);
-    VAinvDA0 = V_Ainv\A_0;
-    AVAinvA = A_0'*V_Ainv*A_0;   # this will not change unless we update the prior
-    v_0     = hypSetup.nu0+n;h = zeros(T,)
-    H_ρ     = sparse(Matrix(1.0I, T, T)) - sparse(hypSetup.ρ*diagm(-1=>repeat(1:1,T-1)));
-    h       = zeros(T,)
-    eh      = similar(h);
-    Ωinv    = sparse(1:T,1:T,exp.(-h));
-    dg_ind_Ωinv = diagind(Ωinv);
-    ZtΩinv  = X'*Ωinv;
-    K_A     = zeros(k,k)
-    A_hat   = similar(A_0)    
-    S_hat   = similar(Matrix(S_0))
-    
-    return Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA 
-end
-
-
 
 """
     
@@ -364,42 +331,42 @@ function Chan2020_drawA(Y,X,n,k,T,v_0,h,Ωinv,dg_ind_Ωinv,V_Ainv,S_0,VAinvDA0,A
 end
 
 
-# Chan2020csv(YY,VARSetup,hypSetup)
-"""
-Implements the BVAR with Minnesota prior with a SUR form and common stochastic volatilty (csv) following Chan (2020)
+# # Chan2020csv(YY,VARSetup,hypSetup)
+# """
+# Implements the BVAR with Minnesota prior with a SUR form and common stochastic volatilty (csv) following Chan (2020)
 
-"""
-function Chan2020csv2(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
-    @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-    @unpack p, nsave, nburn, prior_RW = VARSetup
+# """
+# function Chan2020csv2(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
+#     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
+#     @unpack p, nsave, nburn, prior_RW = VARSetup
     
-    Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA = BEAVARs.initcsv(YY,p,hypSetup,prior_RW);
-    # This part follows page 19 of Chan, J. (2020)
-    ndraws = nsave+nburn;
-    store_β = zeros(k*n,nsave);
-    store_h = zeros(T,nsave);
-    store_Σ = zeros(n,n,nsave);
-    store_s2_h = zeros(T,nsave);
-    store_ρ = zeros(nsave,);
-    store_σ_h2 = zeros(nsave,); 
-    store_eh = zeros(T,nsave);
+#     Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA = BEAVARs.initcsv(YY,p,hypSetup,prior_RW);
+#     # This part follows page 19 of Chan, J. (2020)
+#     ndraws = nsave+nburn;
+#     store_β = zeros(k*n,nsave);
+#     store_h = zeros(T,nsave);
+#     store_Σ = zeros(n,n,nsave);
+#     store_s2_h = zeros(T,nsave);
+#     store_ρ = zeros(nsave,);
+#     store_σ_h2 = zeros(nsave,); 
+#     store_eh = zeros(T,nsave);
 
-    for ii = 1:ndraws 
-        A, cholΣU, Σ, s2_h = BEAVARs.Chan2020_drawA(Y,X,n,k,T,v_0,h,Ωinv,dg_ind_Ωinv,V_Ainv,S_0,VAinvDA0,AVAinvA);
-        h = BEAVARs.Chan2020_draw_h!(h,s2_h,ρ,σ_h2,n,H_ρ,T);
-        ρ, σ_h2, eh = BEAVARs.Chan2020_draw_ρ!(ρ,h,eh,v_h0,S_h0,ρ_0,V_ρ,T);
+#     for ii = 1:ndraws 
+#         A, cholΣU, Σ, s2_h = BEAVARs.Chan2020_drawA(Y,X,n,k,T,v_0,h,Ωinv,dg_ind_Ωinv,V_Ainv,S_0,VAinvDA0,AVAinvA);
+#         h = BEAVARs.Chan2020_draw_h!(h,s2_h,ρ,σ_h2,n,H_ρ,T);
+#         ρ, σ_h2, eh = BEAVARs.Chan2020_draw_ρ!(ρ,h,eh,v_h0,S_h0,ρ_0,V_ρ,T);
 
-        if ii>nburn
-            store_β[:,ii-nburn] = vec(A);
-            store_h[:,ii-nburn] = h;
-            store_Σ[:,:,ii-nburn] = Σ;
-            store_s2_h[:,ii-nburn] = s2_h;
-            store_ρ[ii-nburn,] = ρ;
-            store_σ_h2[ii-nburn,] = σ_h2;
-            store_eh[:,ii-nburn] = eh;
-        end
-    end
+#         if ii>nburn
+#             store_β[:,ii-nburn] = vec(A);
+#             store_h[:,ii-nburn] = h;
+#             store_Σ[:,:,ii-nburn] = Σ;
+#             store_s2_h[:,ii-nburn] = s2_h;
+#             store_ρ[ii-nburn,] = ρ;
+#             store_σ_h2[ii-nburn,] = σ_h2;
+#             store_eh[:,ii-nburn] = eh;
+#         end
+#     end
 
-    return store_β, store_h, store_Σ, store_s2_h, store_ρ, store_σ_h2, store_eh
+#     return store_β, store_h, store_Σ, store_s2_h, store_ρ, store_σ_h2, store_eh
     
-end # end function Chan2020csv
+# end # end function Chan2020csv

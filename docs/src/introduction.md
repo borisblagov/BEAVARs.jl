@@ -118,6 +118,7 @@ BEAVARs.VARSetup
   n_irf: Int64 16
   n_fcst: Int64 8
   const_loc: Int64 1
+  prior_RW: Int64 1
 ```
 
 !!! note "Changes to these structures"
