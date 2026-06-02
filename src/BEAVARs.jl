@@ -277,23 +277,23 @@ end
 
 function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
-    fcast_out_dict = ThreadSafeDict{String,Array{Float64, 3}}()
+    fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
     for (index, value) in pairs(vint_in_dict)
         # println("$index $value")
         println("Estimating data vintage $index")
         model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
         out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
-        YYfcast3D_mat = BEAVARs.forecast(out_struct,set_struct);
+        fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
         vint_out_dict[index] = out_struct;
-        fcast_out_dict[index] = YYfcast3D_mat;
+        fcast_out_dict[index] = fcast_struct;
     end
     
     return vint_out_dict, fcast_out_dict
 end
 
-function beavars_multi(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
-    fcast_out_dict = ThreadSafeDict{String,Array{Float64, 3}}()
+    fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
     ks = collect(keys(vint_in_dict))
     # Threads.@threads for (index, value) in pairs(vint_in_dict)
     Threads.@threads for index in ks
@@ -302,9 +302,9 @@ function beavars_multi(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
         value=vint_in_dict[index];
         model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
         out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
-        YYfcast3D_mat = BEAVARs.forecast(out_struct,set_struct);
+        fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
         vint_out_dict[index] = out_struct;
-        fcast_out_dict[index] = YYfcast3D_mat;
+        fcast_out_dict[index] = fcast_struct;
     end
     
     return vint_out_dict, fcast_out_dict
