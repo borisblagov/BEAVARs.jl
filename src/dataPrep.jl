@@ -280,3 +280,16 @@ function pseudo_oos(fdataHF_tab,fdataLF_tab,pseudoHF_beg_date,pseudoHF_end_date,
     end
     return vint_dict
 end
+
+
+
+function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},vintages_names_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+    n_list = length(model_cols_list);
+    vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
+    for ii=1:n_list 
+        dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpec(model_cols_list[ii],file_path);
+        data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab)
+        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
+    end
+    return vint_dict
+end
