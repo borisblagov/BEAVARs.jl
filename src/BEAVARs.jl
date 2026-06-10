@@ -119,9 +119,9 @@ end
 end
 
 # types for forecast output export
-@with_kw struct VARForecast <: BVARforecastOutput
-    Yfor3d::Array{}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
-    data_tab::TimeArray        # dataset in a TimeArray format   
+@with_kw struct VARForecast{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}  <: BVARforecastOutput
+    Yfor3d::Array{T,3}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
+    data_tab::TimeArray{T,N,D,A}  # dataset in a TimeArray format   
     var_list::Array{Symbol,1}  # variable names for the forecasts
     n_fcst::Int                # number of forecast periods
 end
@@ -237,6 +237,7 @@ function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
     return out_struct
 end
+
 
 function beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
     println("Hello Independent Normal Inverse Wishart")
