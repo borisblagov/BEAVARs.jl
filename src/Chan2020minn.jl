@@ -22,7 +22,6 @@ Generate a dataset strcture for use with the single-frequency models
     data_struct: A dataBVAR_TA structure with the data and metadata
 """
 function makeDataSetup(::Chan2020minn_type,data_tab::TimeArray; var_list =  colnames(data_tab))
-    # return dataBVAR_TA(data_tab, var_list)
     return data_BVAR(data_tab,values(data_tab), var_list)
 end
 
@@ -116,7 +115,7 @@ The function generates forecasts from the Chan2020minn model output.
 """
 function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     @unpack store_β, store_Σ, YY = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst, p, nsave = VARSetup
     n = size(YY,2);
 
     Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
@@ -133,6 +132,9 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
         end
     end
+
+    YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2 = BEAVARs.get_imp_percentiles(fcast_struct.Yfor3d); # TODO add the to the output
+
     # (YYforHF3d,YYforLF3d,dataHF_tab,dataLF_tab,var_list,n_fcst,YYforHF_struct,YYforLF_struct,data_flags_vec,forecast_flags_vec)    
     fcast_struct = BEAVARs.VARForecast(Yfor3D,data_struct.data_tab,data_struct.var_list,n_fcst)
     return fcast_struct

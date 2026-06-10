@@ -349,7 +349,7 @@ end
 
 """
 function forecast(VAROutput::VAROutput_Blagov2025,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
-
+    # TODO change these lines to using the function get_imp_percentiles
     @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
     @unpack n_fcst,p,nsave = VARSetup
     @unpack dataHF_tab, dataLF_tab, var_list = data_struct
