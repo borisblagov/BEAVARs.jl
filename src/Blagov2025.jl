@@ -65,8 +65,8 @@ Blagov, S., Giannone, D., Lenza, M., Modugno, M. (2025), Mixed-Frequency Bayesia
 """
 function Blagov2025(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-    @unpack p, nsave, nburn, n_fcst, const_loc, prior_RW = varSetup
-    ndraws = nsave+nburn;
+    @unpack p, n_save, n_burn, n_fcst, const_loc, prior_RW = varSetup
+    ndraws = n_save+n_burn;
     # nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
     fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
@@ -102,15 +102,15 @@ function Blagov2025(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
 
     # prepare matrices for storage
        
-    store_YY    = zeros(Tf,n,nsave);
-    store_β = zeros(k*n,nsave);
-    store_h = zeros(T,nsave);
-    store_Σt = zeros(n,n,nsave);
-    store_Σt_inv= zeros(n,n,nsave);
-    store_s2_h = zeros(T,nsave);
-    store_ρ = zeros(nsave,);
-    store_σ_h2 = zeros(nsave,); 
-    store_eh = zeros(T,nsave);
+    store_YY    = zeros(Tf,n,n_save);
+    store_β = zeros(k*n,n_save);
+    store_h = zeros(T,n_save);
+    store_Σt = zeros(n,n,n_save);
+    store_Σt_inv= zeros(n,n,n_save);
+    store_s2_h = zeros(T,n_save);
+    store_ρ = zeros(n_save,);
+    store_σ_h2 = zeros(n_save,); 
+    store_eh = zeros(T,n_save);
     
 
     @showprogress for ii in 1:ndraws
@@ -139,17 +139,17 @@ function Blagov2025(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
         VAinvDA0 = V_Ainv\A_0;
         AVAinvA = A_0'*V_Ainv*A_0;   # this will not change unless we update the prior
     
-        if ii>nburn
-            store_YY[:,:,ii-nburn]  = YY;
-            store_Σt_inv[:,:,ii-nburn]    = Σt_inv;
-            # store_Σt[:,:,ii-nburn] = Σt;
-            store_β[:,ii-nburn] = vec(A);
-            store_h[:,ii-nburn] = h;
-            store_Σt[:,:,ii-nburn] = Σ;
-            store_s2_h[:,ii-nburn] = s2_h;
-            store_ρ[ii-nburn,] = ρ;
-            store_σ_h2[ii-nburn,] = σ_h2;
-            store_eh[:,ii-nburn] = eh;
+        if ii>n_burn
+            store_YY[:,:,ii-n_burn]  = YY;
+            store_Σt_inv[:,:,ii-n_burn]    = Σt_inv;
+            # store_Σt[:,:,ii-n_burn] = Σt;
+            store_β[:,ii-n_burn] = vec(A);
+            store_h[:,ii-n_burn] = h;
+            store_Σt[:,:,ii-n_burn] = Σ;
+            store_s2_h[:,ii-n_burn] = s2_h;
+            store_ρ[ii-n_burn,] = ρ;
+            store_σ_h2[ii-n_burn,] = σ_h2;
+            store_eh[:,ii-n_burn] = eh;
         end
     end
 
@@ -351,7 +351,7 @@ end
 function forecast(VAROutput::VAROutput_Blagov2025,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     # TODO change these lines to using the function get_imp_percentiles
     @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     @unpack dataHF_tab, dataLF_tab, var_list = data_struct
     YYforHF3d = store_YY;
     YYforLF3d = mapslices(x->M_inter_agg*x,store_YY,dims=1:2)

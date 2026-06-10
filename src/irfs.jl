@@ -70,10 +70,10 @@ end # End of irf_chol
             - optional parameter, if set to shSize="unity" the shocks are scaled to unity, otherwise they are 1 standard deviation
 """
 function irf_chol_overDraws(store_beta,store_sigma,VARSetup;shSize=0.0)
-    @unpack n,p,const_loc,n_irf,nsave = VARSetup;
-    IRF_4d = zeros(n_irf,n,n,nsave);
+    @unpack n,p,const_loc,n_irf,n_save = VARSetup;
+    IRF_4d = zeros(n_irf,n,n,n_save);
     IRF_mat = zeros(n_irf,n,n);
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         beta_vec = store_beta[:,i_draw];
         sigma_vec = store_sigma[:,i_draw];
     
@@ -90,7 +90,7 @@ end
 
 
 """
-    irf_chol_overDraws_csv(B_store,Σ_store,h_store,n,p,const_loc,n_irf,nsave;shSize = "stdev")
+    irf_chol_overDraws_csv(B_store,Σ_store,h_store,n,p,const_loc,n_irf,n_save;shSize = "stdev")
 
     Impulse response calculation over a distribution of parameters 
     Calls [irf_chol](@ref) 
@@ -103,12 +103,12 @@ end
             - optional parameter, if set to shSize="unity" the shocks are scaled to unity, otherwise they are 1 standard deviation
 """
 function irf_chol_overDraws_csv(store_B,store_Σ,store_h,VARSetup;shSize = 0.0)
-    @unpack n,p,const_loc,n_irf,nsave = VARSetup
-    # nsave = maximum(size(store_B)); # this doesn't work if its a vector
-    IRF_4d = zeros(n_irf,n,n,nsave);
+    @unpack n,p,const_loc,n_irf,n_save = VARSetup
+    # n_save = maximum(size(store_B)); # this doesn't work if its a vector
+    IRF_4d = zeros(n_irf,n,n,n_save);
     IRF_mat = zeros(n_irf,n,n);
     # h_mean = mean(median(exp.(store_h),dims=2));
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         # beta_vec = vec(store_B[:,:,i_draw]);
         h_mean = mean((exp.(store_h[:,i_draw])));
         beta_vec = store_B[:,i_draw];

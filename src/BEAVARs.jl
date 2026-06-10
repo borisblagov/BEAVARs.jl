@@ -110,8 +110,8 @@ end
 
 @with_kw struct VARSetup <: BVARmodelSetup
     p::Int          # number of lags
-    nsave::Int      # gibbs to save
-    nburn::Int      # gibbs to burn
+    n_save::Int      # gibbs to save
+    n_burn::Int      # gibbs to burn
     n_irf::Int      # number of impulse responses
     n_fcst::Int     # number of forecast periods
     const_loc::Int  # location of the constant
@@ -120,7 +120,7 @@ end
 
 # types for forecast output export
 @with_kw struct VARForecast{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}  <: BVARforecastOutput
-    Yfor3d::Array{T,3}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
+    Yfor3d::Array{T,3}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x n_save
     data_tab::TimeArray{T,N,D,A}  # dataset in a TimeArray format   
     var_list::Array{Symbol,1}  # variable names for the forecasts
     n_fcst::Int                # number of forecast periods
@@ -129,8 +129,8 @@ end
 
 # types for forecast output export
 @with_kw struct VAR_MF_Forecast <: BVARforecastOutput
-    YforHF3d::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x nsave
-    YforLF3d::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x nsave
+    YforHF3d::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x n_save
+    YforLF3d::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x n_save
     dataHF_tab::TimeArray      # High frequency dataset in a TimeArray format   
     dataLF_tab::TimeArray      # Low frequency dataset in a TimeArray format 
     var_list::Array{Symbol,1}  # variable names for the forecasts
@@ -154,7 +154,7 @@ Only the first argument is mandatory, rest is optional with default values.
     model_str: String, currently supported are "CPZ2023", "Chan2020minn", "Chan2020csv", "Chan2020iniw", "BGR2010"
     p:         number of lags, default is 4
     n_burn:    number of burn-in draws that will be discarded, default is 2000
-    n_save:    number of retained draws (total is then nburn + nsave), default is 1000
+    n_save:    number of retained draws (total is then n_burn + n_save), default is 1000
     n_irf:     horizon of impulse responses, default is 16
     n_fcst:    horizon of forecasting periods of the lowest frequency variable, default is 8
     hyp:       hyperparameter structure populated with default values for each model. See the relevant papers/documentation for details. To generate your own see the relevant structures below.

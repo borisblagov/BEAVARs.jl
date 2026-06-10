@@ -16,8 +16,8 @@ end
 
 
 function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
-    @unpack p,nburn,nsave, prior_RW = VARSetup
-    ndraws  = nsave+nburn;
+    @unpack p,n_burn,n_save, prior_RW = VARSetup
+    ndraws  = n_save+n_burn;
 
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβminn_inv, Vβminn_inv_elview, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
@@ -27,17 +27,17 @@ function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
 
     # allocate output for saving
-    store_β = zeros(n^2*p+n,nsave);
-    store_Σt = zeros(n,n,nsave);
+    store_β = zeros(n^2*p+n,n_save);
+    store_Σt = zeros(n,n,n_save);
     for ii = 1:ndraws 
         beta = BEAVARs.Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,βMinn,K_β,Y,n,k);
         Σt, Σt_inv = Chan2020_drawΣt(Y,Xsur_den,beta,n,T,S_0,hypSetup.nu0);
 
         Σ_invsp.nzval[:] = Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )
 
-        if ii>nburn
-            store_β[:,ii-nburn] = beta;
-            store_Σt[:,:,ii-nburn] = Σt;
+        if ii>n_burn
+            store_β[:,ii-n_burn] = beta;
+            store_Σt[:,:,ii-n_burn] = Σt;
         end
     end
 
@@ -55,17 +55,17 @@ end
 
 function forecast(VAROutput::VAROutput_Chan2020iniw,VARSetup)
     @unpack store_β, store_Σ, YY = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     n = size(YY,2);
 
     @unpack store_β, store_Σ, YY = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
+    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
     Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         Yfor = @views Yfor3D[:,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views store_Σ[:,:,i_draw];

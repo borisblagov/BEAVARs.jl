@@ -47,7 +47,7 @@ The function implements the homoscedastic Minnesota prior with a SUR form as in 
 Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, https://doi.org/10.1007/978-3-030-31150-6 and https://joshuachan.org/papers/large_BVAR.pdf.
 """
 function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup) where Tp <: AbstractFloat
-    @unpack p,nburn,nsave,prior_RW = VARSetup
+    @unpack p,n_burn,n_save,prior_RW = VARSetup
     
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
@@ -66,16 +66,16 @@ function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodel
     beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
     
 
-    ndraws = nsave+nburn;
-    store_β=zeros(n^2*p+n,nsave);
+    ndraws = n_save+n_burn;
+    store_β=zeros(n^2*p+n,n_save);
     for ii = 1:ndraws 
         beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
-        if ii>nburn
-            store_β[:,ii-nburn] = beta;
+        if ii>n_burn
+            store_β[:,ii-n_burn] = beta;
         end
     end
 
-    store_Σ = repeat(vec(S_0),1,nsave);
+    store_Σ = repeat(vec(S_0),1,n_save);
     return store_β, store_Σ
 end
 
@@ -107,7 +107,7 @@ Generates forecasts from the Chan2020minn model output
     VAROutput: A VAROutput_Chan2020minn structure with the model output
     VARSetup:  A BVARmodelSetup structure with the model setup  
 # Returns
-    Yfor3D:    A 3D array with the forecasts. Dimensions are (p+n_fcst) x n x nsave
+    Yfor3D:    A 3D array with the forecasts. Dimensions are (p+n_fcst) x n x n_save
 
 # Description
 
@@ -115,13 +115,13 @@ The function generates forecasts from the Chan2020minn model output.
 """
 function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     @unpack store_β, store_Σ, YY = VAROutput
-    @unpack n_fcst, p, nsave = VARSetup
+    @unpack n_fcst, p, n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
+    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
     Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         Yfor = @views Yfor3D[:,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);
@@ -149,10 +149,10 @@ end # end function fcastChan2020minn()
 """
 function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup,data_true_ftab)
     @unpack store_β, store_Σ, YY, fdatesLF = VAROutput
-    @unpack n_fcst, p, nsave = VARSetup
+    @unpack n_fcst, p, n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
+    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
     Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     
     data_truef_mat = values(data_true_ftab)
@@ -161,11 +161,11 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
 
     @views data_true_mat = data_truef_mat[data_true_flags_vec,:]    # this is the true data for our T+1 to T+n_fcst forecasts
     
-    logdens_3dmat = fill(NaN,(n_fcst,n,nsave))
-    joint_logdens_3dmat = fill(NaN,(n_fcst,1,nsave))
+    logdens_3dmat = fill(NaN,(n_fcst,n,n_save))
+    joint_logdens_3dmat = fill(NaN,(n_fcst,1,n_save))
 
 
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         Yfor = @views Yfor3D[:,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);

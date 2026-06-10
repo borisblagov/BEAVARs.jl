@@ -26,7 +26,7 @@ Implements the BVAR with Minnesota prior with a SUR form and common stochastic v
 """
 function Chan2020csv(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-    @unpack p, nsave, nburn, prior_RW = VARSetup
+    @unpack p, n_save, n_burn, prior_RW = VARSetup
 
     Y, X, T, n = mlagL(YY,p)
     (deltaP, sigmaP, mu_prior) = trainPriors(YY,p)
@@ -48,14 +48,14 @@ function Chan2020csv(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARm
     # H_ρ = Bidiagonal(dv,ev,:L)
     
     # This part follows page 19 of Chan, J. (2020)
-    ndraws = nsave+nburn;
-    store_β = zeros(np1*n,nsave);
-    store_h = zeros(T,nsave);
-    store_Σ = zeros(n,n,nsave);
-    store_s2_h = zeros(T,nsave);
-    store_ρ = zeros(nsave,);
-    store_σ_h2 = zeros(nsave,); 
-    store_eh = zeros(T,nsave);
+    ndraws = n_save+n_burn;
+    store_β = zeros(np1*n,n_save);
+    store_h = zeros(T,n_save);
+    store_Σ = zeros(n,n,n_save);
+    store_s2_h = zeros(T,n_save);
+    store_ρ = zeros(n_save,);
+    store_σ_h2 = zeros(n_save,); 
+    store_eh = zeros(T,n_save);
     
     eh = similar(h);
 
@@ -97,14 +97,14 @@ function Chan2020csv(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARm
         H_ρ[diagind(H_ρ,-1)]=fill(-ρ,T-1);
         # H_ρ.ev.=-ρ.*ones(T-1,)
 
-        if ii>nburn
-            store_β[:,ii-nburn] = vec(A);
-            store_h[:,ii-nburn] = h;
-            store_Σ[:,:,ii-nburn] = Σ;
-            store_s2_h[:,ii-nburn] = s2_h;
-            store_ρ[ii-nburn,] = ρ;
-            store_σ_h2[ii-nburn,] = σ_h2;
-            store_eh[:,ii-nburn] = eh;
+        if ii>n_burn
+            store_β[:,ii-n_burn] = vec(A);
+            store_h[:,ii-n_burn] = h;
+            store_Σ[:,:,ii-n_burn] = Σ;
+            store_s2_h[:,ii-n_burn] = s2_h;
+            store_ρ[ii-n_burn,] = ρ;
+            store_σ_h2[ii-n_burn,] = σ_h2;
+            store_eh[:,ii-n_burn] = eh;
         end
     end
 
@@ -272,17 +272,17 @@ end
 """
 function forecast(VAROutput::VAROutput_Chan2020csv,VARSetup)
     @unpack store_β, store_Σ, store_h, s2_h_store, store_ρ, store_σ_h2,store_eh, YY = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
-    hfor3D    = fill(NaN,(p+n_fcst,nsave)); 
+    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
+    hfor3D    = fill(NaN,(p+n_fcst,n_save)); 
     
     
     Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     hfor3D[1:p,:] = @views store_h[end-p+1:end,:];
     
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
     
         hfor = @views hfor3D[:,i_draw];
         Yfor = @views Yfor3D[:,:,i_draw];
@@ -338,32 +338,32 @@ end
 # """
 # function Chan2020csv2(YY::Array{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
 #     @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hypSetup
-#     @unpack p, nsave, nburn, prior_RW = VARSetup
+#     @unpack p, n_save, n_burn, prior_RW = VARSetup
     
 #     Y, X, T, n, k, sigmaP, S_0, Σ, A_0, V_Ainv, v_0, H_ρ,h,eh,Ωinv, dg_ind_Ωinv, VAinvDA0, AVAinvA = BEAVARs.initcsv(YY,p,hypSetup,prior_RW);
 #     # This part follows page 19 of Chan, J. (2020)
-#     ndraws = nsave+nburn;
-#     store_β = zeros(k*n,nsave);
-#     store_h = zeros(T,nsave);
-#     store_Σ = zeros(n,n,nsave);
-#     store_s2_h = zeros(T,nsave);
-#     store_ρ = zeros(nsave,);
-#     store_σ_h2 = zeros(nsave,); 
-#     store_eh = zeros(T,nsave);
+#     ndraws = n_save+n_burn;
+#     store_β = zeros(k*n,n_save);
+#     store_h = zeros(T,n_save);
+#     store_Σ = zeros(n,n,n_save);
+#     store_s2_h = zeros(T,n_save);
+#     store_ρ = zeros(n_save,);
+#     store_σ_h2 = zeros(n_save,); 
+#     store_eh = zeros(T,n_save);
 
 #     for ii = 1:ndraws 
 #         A, cholΣU, Σ, s2_h = BEAVARs.Chan2020_drawA(Y,X,n,k,T,v_0,h,Ωinv,dg_ind_Ωinv,V_Ainv,S_0,VAinvDA0,AVAinvA);
 #         h = BEAVARs.Chan2020_draw_h!(h,s2_h,ρ,σ_h2,n,H_ρ,T);
 #         ρ, σ_h2, eh = BEAVARs.Chan2020_draw_ρ!(ρ,h,eh,v_h0,S_h0,ρ_0,V_ρ,T);
 
-#         if ii>nburn
-#             store_β[:,ii-nburn] = vec(A);
-#             store_h[:,ii-nburn] = h;
-#             store_Σ[:,:,ii-nburn] = Σ;
-#             store_s2_h[:,ii-nburn] = s2_h;
-#             store_ρ[ii-nburn,] = ρ;
-#             store_σ_h2[ii-nburn,] = σ_h2;
-#             store_eh[:,ii-nburn] = eh;
+#         if ii>n_burn
+#             store_β[:,ii-n_burn] = vec(A);
+#             store_h[:,ii-n_burn] = h;
+#             store_Σ[:,:,ii-n_burn] = Σ;
+#             store_s2_h[:,ii-n_burn] = s2_h;
+#             store_ρ[ii-n_burn,] = ρ;
+#             store_σ_h2[ii-n_burn,] = σ_h2;
+#             store_eh[:,ii-n_burn] = eh;
 #         end
 #     end
 

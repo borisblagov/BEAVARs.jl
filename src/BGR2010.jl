@@ -141,16 +141,16 @@ end
 
 
 """
-    gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,nburn,nsave)
+    gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,n_burn,n_save)
 
     Implements the gibbs sampler for the Bayesian VAR using dummy variables 
      as in Banbura, Giannone, and Reichlin (2010), Large Bayesian Vectorautoregressions, _Journal of Applied Econometrics_
 """
-function gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,nburn,nsave)
+function gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,n_burn,n_save)
     k = n*(n*p+1)
-    ndraws = nsave+nburn;
-    store_beta=zeros(k,nsave);
-    store_sigma=zeros(n*n,nsave);
+    ndraws = n_save+n_burn;
+    store_beta=zeros(k,n_save);
+    store_sigma=zeros(n*n,n_save);
     beta_mean = vec(Xstar\Ystar)
     beta = similar(beta_mean)
     iXX = inv(Xstar'*Xstar)
@@ -167,9 +167,9 @@ function gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,nburn,nsave)
 
         getSigma!(Tstar,P,Sigma_tilde)
 
-        if ii>nburn
-            store_beta[:,ii-nburn] = beta;
-            store_sigma[:,ii-nburn] = vec(Sigma_tilde);
+        if ii>n_burn
+            store_beta[:,ii-n_burn] = beta;
+            store_sigma[:,ii-n_burn] = vec(Sigma_tilde);
         end
     end
     return store_beta, store_sigma
@@ -186,7 +186,7 @@ Implements the BVAR with Minnesota prior with a SUR form and common stochastic v
 """
 function BGR2010(Z::Matrix{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     @unpack lambda, epsi = hypSetup
-    @unpack p, nsave, nburn = VARSetup
+    @unpack p, n_save, n_burn = VARSetup
     # p = lags;
     deltaP_mat, sigmaP_vec, mu_prior = trainPriors(Z,1)
     delta = deltaP_mat[1,:];
@@ -213,7 +213,7 @@ function BGR2010(Z::Matrix{Float64},VARSetup::BVARmodelSetup,hypSetup::BVARmodel
     Yd2, Xd2 = makeDummiesSumOfCoeff!(delta,mu_prior,tau,n,p,Yd2,Xd2);
 
 
-    store_beta, store_sigma =  gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,nburn,nsave);
+    store_beta, store_sigma =  gibbs_beta_sigma(Tstar,n,p,Ystar,Xstar,n_burn,n_save);
 
     # display("done")
 
@@ -232,13 +232,13 @@ end
 
 function forecast(VAROutput::VAROutput_BGR2010,VARSetup)
     @unpack store_β, store_Σ, YY = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,nsave))
+    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
     Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
     
-    for i_draw = 1:nsave
+    for i_draw = 1:n_save
         Yfor = @views Yfor3D[:,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);

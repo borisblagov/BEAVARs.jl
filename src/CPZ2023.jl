@@ -431,8 +431,8 @@ Main function
 
 """
 function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
-    @unpack p, nburn,nsave, const_loc, n_fcst, prior_RW = varSetup
-    ndraws = nsave+nburn;
+    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW = varSetup
+    ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
     fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
@@ -464,10 +464,10 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
     
 
     # prepare matrices for storage
-    store_YY    = zeros(Tf,n,nsave);
-    store_β     = zeros(n^2*p+n,nsave);
-    store_Σt_inv= zeros(n,n,nsave);
-    store_Σt    = zeros(n,n,nsave);
+    store_YY    = zeros(Tf,n,n_save);
+    store_β     = zeros(n^2*p+n,n_save);
+    store_Σt_inv= zeros(n,n,n_save);
+    store_Σt    = zeros(n,n,n_save);
 
     for ii in 1:ndraws
         # draw of the missing values
@@ -476,11 +476,11 @@ function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
         # draw of the parameters
         beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta,prior_RW);
 
-        if ii>nburn
-            store_β[:,ii-nburn]  = beta;
-            store_YY[:,:,ii-nburn]  = YY;
-            store_Σt_inv[:,:,ii-nburn]    = Σt_inv;
-            store_Σt[:,:,ii-nburn] = Σt;
+        if ii>n_burn
+            store_β[:,ii-n_burn]  = beta;
+            store_YY[:,:,ii-n_burn]  = YY;
+            store_Σt_inv[:,:,ii-n_burn]    = Σt_inv;
+            store_Σt[:,:,ii-n_burn] = Σt;
         end
     end
 
@@ -497,8 +497,8 @@ Main function
 
 """
 function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
-    @unpack p, nburn,nsave, const_loc, n_fcst = varSetup
-    ndraws = nsave+nburn;
+    @unpack p, n_burn,n_save, const_loc, n_fcst = varSetup
+    ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
     fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
@@ -517,8 +517,8 @@ end
 
 
 function CPZ2023n(YYwNA, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames,varSetup,hypSetup)
-    @unpack p, nburn,nsave, const_loc = varSetup
-    ndraws = nsave+nburn;
+    @unpack p, n_burn,n_save, const_loc = varSetup
+    ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
 
@@ -543,10 +543,10 @@ function CPZ2023n(YYwNA, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames,varS
     
 
     # prepare matrices for storage
-    store_YY    = zeros(Tf,n,nsave);
-    store_β     = zeros(n^2*p+n,nsave);
-    store_Σt_inv= zeros(n,n,nsave);
-    store_Σt    = zeros(n,n,nsave);
+    store_YY    = zeros(Tf,n,n_save);
+    store_β     = zeros(n^2*p+n,n_save);
+    store_Σt_inv= zeros(n,n,n_save);
+    store_Σt    = zeros(n,n,n_save);
 
     @showprogress for ii in 1:ndraws
         # draw of the missing values
@@ -555,11 +555,11 @@ function CPZ2023n(YYwNA, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames,varS
         # draw of the parameters
         beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta);
 
-        if ii>nburn
-            store_β[:,ii-nburn]  = beta;
-            store_YY[:,:,ii-nburn]  = YY;
-            store_Σt_inv[:,:,ii-nburn]    = Σt_inv;
-            store_Σt[:,:,ii-nburn] = Σt;
+        if ii>n_burn
+            store_β[:,ii-n_burn]  = beta;
+            store_YY[:,:,ii-n_burn]  = YY;
+            store_Σt_inv[:,:,ii-n_burn]    = Σt_inv;
+            store_Σt[:,:,ii-n_burn] = Σt;
         end
     end
 
@@ -620,7 +620,7 @@ end
 function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     # TODO change these lines to using the function get_imp_percentiles
     @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
-    @unpack n_fcst,p,nsave = VARSetup
+    @unpack n_fcst,p,n_save = VARSetup
     @unpack dataHF_tab, dataLF_tab, var_list = data_struct
     YYforHF3d = store_YY;
     YYforLF3d = mapslices(x->M_inter_agg*x,store_YY,dims=1:2)
