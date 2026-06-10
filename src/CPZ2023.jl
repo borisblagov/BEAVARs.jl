@@ -60,7 +60,7 @@ function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     fvarNames = colnames(fdataHF_tab)                # full list of the variable names
     datesHF = timestamp(fdataHF_tab)
     datesLF = timestamp(z_tab)
-    freqL_date = Month(datesLF[2])-Month(datesLF[1]) # looks whether the data is quarterly or yearly
+    freqL_date = Month(datesLF[2])-Month(datesLF[1]) # looks whether the data is quarterly or yearly # TODO change this to the function BEAVARs.get_data_freq(data_tab) in dataPrep
     freqH_date = Month(datesHF[2])-Month(datesHF[1])
 
     if freqL_date==Month(0)

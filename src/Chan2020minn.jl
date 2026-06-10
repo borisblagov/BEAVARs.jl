@@ -22,7 +22,8 @@ Generate a dataset strcture for use with the single-frequency models
     data_struct: A dataBVAR_TA structure with the data and metadata
 """
 function makeDataSetup(::Chan2020minn_type,data_tab::TimeArray; var_list =  colnames(data_tab))
-    return dataBVAR_TA(data_tab, var_list)
+    # return dataBVAR_TA(data_tab, var_list)
+    return data_BVAR(data_tab,values(data_tab), var_list)
 end
 
 
@@ -46,7 +47,7 @@ The function implements the homoscedastic Minnesota prior with a SUR form as in 
 # Reference
 Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, https://doi.org/10.1007/978-3-030-31150-6 and https://joshuachan.org/papers/large_BVAR.pdf.
 """
-function Chan2020minn(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
+function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup) where Tp <: AbstractFloat
     @unpack p,nburn,nsave,prior_RW = VARSetup
     
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
@@ -59,15 +60,15 @@ function Chan2020minn(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     mul!(XtΣ_inv_X,XtΣ_inv_den,Xsur_den);           #  X'*( I(T) ⊗ Σ^{-1} )*X
     K_β[:,:] .= Vβ_inv .+ XtΣ_inv_X;                #  K_β = V^{-1} + X'*( I(T) ⊗ Σ^{-1} )*X
     prior_ = Vβ_inv*βMinn;                          #  V^-1 * βMinn 
-    println(prior_)
+    # println(prior_)
     mul!(prior_,XtΣ_inv_den, vec(Y'),1.0,1.0);      # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
-    println(prior_)
+    # println(prior_);
     cholK_β = cholesky(Hermitian(K_β));             # Cholesky factor
     beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
     
 
     ndraws = nsave+nburn;
-    store_β=zeros(n^2*p+n,nsave)
+    store_β=zeros(n^2*p+n,nsave);
     for ii = 1:ndraws 
         beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
         if ii>nburn
@@ -82,10 +83,11 @@ end
 
 
 # types for output export
-@with_kw struct VAROutput_Chan2020minn <: BVARmodelOutput
-    store_β::Array{}      # 
-    store_Σ::Array{}      # 
-    YY::Array{}             #
+@with_kw struct VAROutput_Chan2020minn{T <: AbstractFloat, N}  <: BVARmodelOutput
+    store_β::Array{T,N}      # 
+    store_Σ::Array{T,N}      # 
+    YY::Array{T,N}            #
+    fdatesLF:: Vector{DateTime}
 end
 
 

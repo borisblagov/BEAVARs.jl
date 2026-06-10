@@ -92,6 +92,13 @@ end
     var_list::Array{Symbol,1}                                          # Symbol vector with the variable names, will be used for ordering
 end
 
+# Structure for the datasets for the standard BVARs
+@with_kw struct data_BVAR{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    data_tab::TimeArray{T,N,D,A}                                             # data for the high-frequency variables
+    data_mat::Array{T,N}
+    var_list::Array{Symbol,1}                                          # Symbol vector with the variable names, will be used for ordering
+end
+
 # Structure to hold the median, 68% and 95% percentiles of the forecasts for a VAR
 @with_kw struct data_fcast_PI <: BVARmodelDataSetup
     YYfor_low05_tab::TimeArray         
@@ -220,10 +227,14 @@ include("plot_functions.jl")
 
 function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     println("Hello Minn")
-    @unpack data_tab, var_list = data_struct
-    YY = values(data_tab);
+    @unpack data_tab, data_mat, var_list = data_struct;
+    freqL_date = BEAVARs.get_data_freq(data_tab);
+    datesLF = timestamp(data_tab);
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
+    fdatesLF = [datesLF;datesLF_fcast];
+    YY = data_mat;
     store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
-    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY)
+    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
     return out_struct
 end
 
