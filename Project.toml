@@ -18,7 +18,6 @@ Skipper = "fc65d762-6112-4b1c-b428-ad0792653d81"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 ThreadSafeDicts = "4239201d-c60e-5e0a-9702-85d713665ba7"
-TimeArrays = "058eeebf-2231-41de-8410-62311c15f51e"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
 

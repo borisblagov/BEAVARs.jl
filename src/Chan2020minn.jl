@@ -131,6 +131,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
         end
     end
+    # (YYforHF3d,YYforLF3d,dataHF_tab,dataLF_tab,var_list,n_fcst,YYforHF_struct,YYforLF_struct,data_flags_vec,forecast_flags_vec)    
     fcast_struct = BEAVARs.VARForecast(Yfor3D,data_struct.data_tab,data_struct.var_list,n_fcst)
     return fcast_struct
 

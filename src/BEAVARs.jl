@@ -220,7 +220,8 @@ include("plot_functions.jl")
 
 function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     println("Hello Minn")
-    YY = values(data_struct.data_tab);
+    @unpack data_tab, var_list = data_struct
+    YY = values(data_tab);
     store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY)
     return out_struct

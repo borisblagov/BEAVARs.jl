@@ -293,3 +293,29 @@ function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String
     end
     return vint_dict
 end
+
+@doc raw"""
+    get_data_freq(data_tab)
+
+    Get the frequency of a TimeArray based on the difference between the first two timestamps.  
+
+    # Arguments
+    - `data_tab`: A TimeArray for which to calculate the frequency.
+
+    # Returns
+    - date duration, 1 month for monthly data, 3 months for quarterly data and 12 months for yearly data.
+
+    # Example
+    ```julia
+    using Dates
+    data_tab = TimeArray(DateTime(2020,1,1):Quarter(1):DateTime(2027,4,1),rand(30,3))
+    freq = BEAVARs.get_data_freq(data_tab)
+    julia> 3 months
+    ```
+    
+"""
+function get_data_freq(data_tab)
+    dates = timestamp(data_tab);
+    freq = Month(dates[2])-Month(dates[1]);
+    return freq
+end
