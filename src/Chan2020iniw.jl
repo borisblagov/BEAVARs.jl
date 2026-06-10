@@ -159,8 +159,7 @@ function forecast(VAROutput::VAROutput_Chan2020iniw,VARSetup::BVARmodelSetup,dat
     lpl_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(logdens_3dmat.-BEAVARs.nanfunc(maximum,exp.(logdens_3dmat),dims=3)),dims=3)),dims=3); # log predictive likelihood for this vintage. Chan does a trick with the maximum that I don't know what it does
     
     # lpl_joint_mat = dropdims(log.(nanfunc(mean,exp.(joint_logdens_3dmat),dims=3)),dims=3)
-    lpl_joint_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(joint_logdens_3dmat.-BEAVARs.nanfunc(maximum,exp.(joint_logdens_3dmat),dims=3)),dims=3)),dims=3); # log predictive likelihood for this vintage. Chan does a trick with the maximum that I don't know what it does
-    
+    lpl_joint_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(joint_logdens_3dmat.-BEAVARs.nanfunc(maximum,joint_logdens_3dmat,dims=3)),dims=3)),dims=3)
 
     Yfor3d = Yfor3D[p+1:end,:,:];
     fcast_ϵ_mat = dropdims(mean(-(Yfor3d[forecast_flags_vec,:,:] .-  data_truef_mat[data_true_flags_vec,:]),dims=3),dims=3);    # forecast errors
