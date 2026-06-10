@@ -225,27 +225,7 @@ include("plot_functions.jl")
 # The Den: this is where the beavars live
 #-------------------------------------
 
-function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
-    println("Hello Minn")
-    @unpack data_tab, data_mat, var_list = data_struct;
-    freqL_date = BEAVARs.get_data_freq(data_tab);
-    datesLF = timestamp(data_tab);
-    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
-    fdatesLF = [datesLF;datesLF_fcast];
-    YY = data_mat;
-    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
-    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
-    return out_struct
-end
 
-
-function beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
-    println("Hello Independent Normal Inverse Wishart")
-    YY = values(data_struct.data_tab);
-    store_β, store_Σ = Chan2020iniw(YY,set_struct,hyp_str);
-    out_struct = VAROutput_Chan2020iniw(store_β,store_Σ,YY)
-    return out_struct
-end
 
 
 @doc raw"""

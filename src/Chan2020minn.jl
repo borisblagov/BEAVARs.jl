@@ -5,9 +5,21 @@
 # [https://doi.org/10.1007/978-3-030-31150-6](https://doi.org/10.1007/978-3-030-31150-6), 
 # see also [joshuachan.org](https://joshuachan.org) and his [pdf](https://joshuachan.org/papers/large_BVAR.pdf).
 
+
+
+# types for output export
+@with_kw struct VAROutput_Chan2020minn{T <: AbstractFloat, N}  <: BVARmodelOutput
+    store_β::Array{T,N}      # 
+    store_Σ::Array{T,N}      # 
+    YY::Array{T,N}            #
+    fdatesLF:: Vector{DateTime}
+end
+
 function makeHypSetup(::Chan2020minn_type)
     return hypChan2020()
 end
+
+
 
 @doc raw"""
     makeDataSetup(::Chan2020minn_type,data_tab::TimeArray; var_list =  colnames(data_tab))
@@ -79,14 +91,20 @@ function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodel
     return store_β, store_Σ
 end
 
-
-
-# types for output export
-@with_kw struct VAROutput_Chan2020minn{T <: AbstractFloat, N}  <: BVARmodelOutput
-    store_β::Array{T,N}      # 
-    store_Σ::Array{T,N}      # 
-    YY::Array{T,N}            #
-    fdatesLF:: Vector{DateTime}
+#-----------------------
+# The den of the beavar
+#-----------------------
+function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
+    println("Hello Minn")
+    @unpack data_tab, data_mat, var_list = data_struct;
+    freqL_date = BEAVARs.get_data_freq(data_tab);
+    datesLF = timestamp(data_tab);
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
+    fdatesLF = [datesLF;datesLF_fcast];
+    YY = data_mat;
+    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
+    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
+    return out_struct
 end
 
 
@@ -99,7 +117,7 @@ function makeForecastOutput(::Chan2020minn_type,Yfor3D)
 end
 
 @doc raw"""
-    Yfor3D = BEAVARs.forecast(VAROutput::VAROutput_Chan2020minn,VARSetup)
+    Yfor3D = BEAVARs.forecast(VAROutput::VAROutput_Chan2020minn,,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
 
 Generates forecasts from the Chan2020minn model output
 
@@ -107,7 +125,7 @@ Generates forecasts from the Chan2020minn model output
     VAROutput: A VAROutput_Chan2020minn structure with the model output
     VARSetup:  A BVARmodelSetup structure with the model setup  
 # Returns
-    Yfor3D:    A 3D array with the forecasts. Dimensions are (p+n_fcst) x n x n_save
+    fcast_struct:    The forecast structure
 
 # Description
 
@@ -128,7 +146,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
                 
         for i_for = 1:n_fcst
             tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
-            tclass = [1;tclass];
+            tclass = [1.0;tclass];
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
         end
     end
@@ -167,6 +185,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
 
     for i_draw = 1:n_save
         Yfor = @views Yfor3D[:,:,i_draw];
+        YforExp = @views Yfor3D[p+1:end,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);
         sqSig = sqrt.(Σ_draw);
@@ -176,15 +195,17 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
         for i_for = 1:n_fcst
             tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
             tclass = [1;tclass];
-            Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
+            Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';   
+            YforExp[i_for,:]=tclass'*A_draw;      
         end
 
         YY_fcast = @views Yfor3D[p+1:end,:,i_draw]
         fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YY_fcast[forecast_flags_vec,:];       # fcast error for draw i
+        E_fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YforExp[forecast_flags_vec,:];       # fcast error compared to the expectation
 
-        res = [sqSig\r for r in eachrow(fcast_errors_i)]                                # adjusted for the model variance 
+        res = [sqSig\r for r in eachrow(E_fcast_errors_i)]                                # adjusted for the model variance 
         joint_logdens_3dmat[forecast_flags_vec,:,i_draw] = (-n/2).*log(2*π) .-sum(log.(diag(sqSig))) .- 0.5.*[r'*r for r in eachrow(res)]
-        logdens_vv = [-.5*log.(2*π.*Sig_vec) - 0.5.*(r.^2)./Sig_vec for r in eachrow(fcast_errors_i)]
+        logdens_vv = [-.5*log.(2*π.*Sig_vec) - 0.5.*(r.^2)./Sig_vec for r in eachrow(E_fcast_errors_i)]
         logdens_3dmat[forecast_flags_vec,:,i_draw] = reduce(hcat,logdens_vv)';
 
     end
