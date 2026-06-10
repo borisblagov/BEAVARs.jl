@@ -320,4 +320,3 @@ function get_data_freq(data_tab)
     return freq
 end
 
-
