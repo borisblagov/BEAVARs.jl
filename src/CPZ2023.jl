@@ -504,85 +504,6 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
 end
 
 
-@doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
-
-Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
-
-Main function
-
-"""
-function CPZ2023warntype(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
-    @unpack p, n_burn,n_save, const_loc, n_fcst = varSetup
-    ndraws = n_save+n_burn;
-    nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
-
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
-
-    YYwNA = values(fdataHF_tab);
-    YY = deepcopy(YYwNA);
-    Tf,n = size(YY);
-    
-    B_draw, structB_draw, Σt_inv, b0 = BEAVARs.initParamMatrices(n,p,const_loc) 
-
-    YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_invsp, Σt_LI, Σp_invsp, Σpt_ind, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym = BEAVARs.CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p);
-    
-
-end
-
-
-
-function CPZ2023n(YYwNA, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames,varSetup,hypSetup)
-    @unpack p, n_burn,n_save, const_loc = varSetup
-    ndraws = n_save+n_burn;
-    nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
-
-
-    YY = deepcopy(YYwNA);
-    Tf,n = size(YY);
-    
-    B_draw, structB_draw, Σt_inv, b0 = BEAVARs.initParamMatrices(n,p,const_loc) 
-
-    YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_invsp, Σt_LI, Σp_invsp, Σpt_ind, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym = BEAVARs.CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p);
-    
-    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
-
-    # YY has missing values so we need to draw them once to be able to initialize matrices and prior values
-    YYt = BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
-    
-    # we will be updating the priors for variables with many missing observations (>25%)
-    updP_vec = sum(Sm_bit,dims=2).>size(Sm_bit,2)*0.25;
-    
-    # Initialize matrices for updating the parameter draws from CPZ_iniv  
-    # ------------------------------------
-    Y, X, T, deltaP, sigmaP, mu_prior, V_Minn_inv, V_Minn_inv_elview, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept = CPZ_initMinn(YY,p)
-    
-
-    # prepare matrices for storage
-    store_YY    = zeros(Tf,n,n_save);
-    store_β     = zeros(n^2*p+n,n_save);
-    store_Σt_inv= zeros(n,n,n_save);
-    store_Σt    = zeros(n,n,n_save);
-
-    @showprogress for ii in 1:ndraws
-        # draw of the missing values
-        BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
-        
-        # draw of the parameters
-        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,mu_prior,deltaP,sigmaP,const_loc,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,V_Minn_inv,V_Minn_inv_elview,updP_vec,K_β,beta);
-
-        if ii>n_burn
-            store_β[:,ii-n_burn]  = beta;
-            store_YY[:,:,ii-n_burn]  = YY;
-            store_Σt_inv[:,:,ii-n_burn]    = Σt_inv;
-            store_Σt[:,:,ii-n_burn] = Σt;
-        end
-    end
-
-    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp
-end
-
-
 
 
 """
@@ -631,6 +552,8 @@ end
 #--------------------------------------
 # Forecast Block for CPZ2023
 @doc raw"""
+    forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
+
 
 """
 function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
