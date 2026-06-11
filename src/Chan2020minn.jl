@@ -163,9 +163,13 @@ end # end function fcastChan2020minn()
 
 
 """
-    forecast()
+    forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup,data_true_ftab)
+
+    Calculates forecast for the classic Minnesota model given and compares it with the true data provided in data_true_ftab.
+
+
 """
-function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup,data_true_ftab)
+function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup,data_true_ftab::TimeArray{T,N,D,A}) where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
     @unpack store_β, store_Σ, YY, fdatesLF = VAROutput
     @unpack n_fcst, p, n_save = VARSetup
     n = size(YY,2);
@@ -193,14 +197,11 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
 
                 
         for i_for = 1:n_fcst
-            tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
-            tclass = [1;tclass];
+            tclass = [1.0; @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')];
             Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';   
             YforExp[i_for,:]=tclass'*A_draw;      
         end
 
-        YY_fcast = @views Yfor3D[p+1:end,:,i_draw]
-        fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YY_fcast[forecast_flags_vec,:];       # fcast error for draw i
         E_fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YforExp[forecast_flags_vec,:];       # fcast error compared to the expectation
 
         res = [sqSig\r for r in eachrow(E_fcast_errors_i)]                                # adjusted for the model variance 
@@ -210,9 +211,10 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
 
     end
 
-    lpl_mat = dropdims(log.(nanfunc(mean,exp.(logdens_3dmat),dims=3)),dims=3); # log predictive likelihood for this vintage. Chan does a trick with the maximum that I don't know what it does
-    # lpl_mat = dropdims(log.(mean(exp.(logdens_3dmat.-maximum(logdens_3dmat,dims=3)),dims=3)),dims=3)+maximum(logdens_3dmat,dims=3)    
-    lpl_joint_mat = dropdims(log.(nanfunc(mean,exp.(joint_logdens_3dmat),dims=3)),dims=3)
+    lpl_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(logdens_3dmat.-BEAVARs.nanfunc(maximum,exp.(logdens_3dmat),dims=3)),dims=3)),dims=3); # log predictive likelihood for this vintage. Chan does a trick with the maximum that I don't know what it does
+    
+    max_dens = BEAVARs.nanfunc(maximum,joint_logdens_3dmat,dims=3);
+    lpl_joint_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(joint_logdens_3dmat.-max_dens),dims=3))+max_dens,dims=3);
 
     Yfor3d = Yfor3D[p+1:end,:,:];
     fcast_ϵ_mat = dropdims(mean(-(Yfor3d[forecast_flags_vec,:,:] .-  data_truef_mat[data_true_flags_vec,:]),dims=3),dims=3);    # forecast errors
