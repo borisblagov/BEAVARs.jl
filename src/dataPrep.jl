@@ -314,9 +314,9 @@ end
     ```
     
 """
-function get_data_freq(data_tab)
+function get_data_freq(data_tab::TimeArray{T,N,D,A}) where {T<: AbstractFloat, N, D,A<:AbstractArray{T,N}}
     dates = timestamp(data_tab);
-    freq = Month(dates[2])-Month(dates[1]);
+    freq::Month = Month(dates[2])-Month(dates[1]);
     return freq
 end
 

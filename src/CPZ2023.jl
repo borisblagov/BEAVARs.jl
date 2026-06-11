@@ -15,9 +15,9 @@ Generate a dataset strcture for use with CPZ2023 model
 
 See also `makeDataSetup`.
 """
-@with_kw struct dataCPZ2023 <: BVARmodelDataSetup
-    dataHF_tab::TimeArray                                       # data for the high-frequency variables
-    dataLF_tab::TimeArray                                       # data for the low-frequency variables
+@with_kw struct dataCPZ2023{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    dataHF_tab::TimeArray{T,N,D,A}                                       # data for the high-frequency variables
+    dataLF_tab::TimeArray{T,N,D,A}                                       # data for the low-frequency variables
     var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
 end
 
@@ -50,20 +50,25 @@ end
     e.g. [varNamesLF; varNamesHF] and not [varNamesLF, varNamesHF]
     prior_RW = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
 """
-function CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
-    varNamesLF = colnames(dataLF_tab)
-    # z_tab = dataLF_tab[.!isnan.(dataLF_tab)];
-    z_tab = dataLF_tab;
-    # add the z_tab as NaN values in the high-frequency tab
-    fdataHF_tab = merge(dataHF_tab,map((timestamp, values) -> (timestamp, values.*NaN), z_tab[varNamesLF]),method=:outer)
-    fdataHF_tab = fdataHF_tab[varOrder]              # ordering the variables as the user wants them
-    fvarNames = colnames(fdataHF_tab)                # full list of the variable names
-    datesHF = timestamp(fdataHF_tab)
-    datesLF = timestamp(z_tab)
-    freqL_date = Month(datesLF[2])-Month(datesLF[1]) # looks whether the data is quarterly or yearly # TODO change this to the function BEAVARs.get_data_freq(data_tab) in dataPrep
-    freqH_date = Month(datesHF[2])-Month(datesHF[1])
+function CPZ_prep_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)  where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
+    varNamesLF::Vector{Symbol} = Vector{Symbol}(colnames(dataLF_tab))
+    z_tab::TimeArray{T,N,D,A} = dataLF_tab
 
-    if freqL_date==Month(0)
+    fdataHF_tab::TimeArray{T,N,D,A} = merge(
+        dataHF_tab,
+        map((timestamp, values) -> (timestamp, values .* NaN), z_tab[varNamesLF]),
+        method = :outer,
+    )
+    fdataHF_tab = fdataHF_tab[varOrder]
+    fvarNames::Vector{Symbol} = Vector{Symbol}(colnames(fdataHF_tab))
+    datesHF::Vector{Date} = timestamp(fdataHF_tab)
+    datesLF::Vector{Date} = timestamp(z_tab)
+    # freqL_date::Month = Month(datesLF[2]) - Month(datesLF[1])
+    # freqH_date::Month = Month(datesHF[2]) - Month(datesHF[1])
+    freqL_date = get_data_freq(dataLF_tab);
+    freqH_date = get_data_freq(dataHF_tab);
+
+    if freqL_date == Month(0)
         freqL_date = Month(12)
     end 
     # tuple showing the specification: 1, 3, 12 are monthly quarterly, annually and 0,1 is growth rates or log-levels
@@ -420,6 +425,17 @@ function CPZ_iniw!(YY,p,hypSetup,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σ
 end
 
 
+#-------------------------------------
+# The Den: this is where the beavar lives
+#-------------------------------------
+function beavar(::CPZ2023_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
+    println("Hello CPZ2023")
+    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
+    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
+    return out_struct
+end
+
 
 
 @doc raw"""
@@ -430,7 +446,7 @@ Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishar
 Main function
 
 """
-function CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hypSetup)
+function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup) where {Typ <: AbstractFloat, N, D, A <: AbstractArray{Typ, N}}
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW = varSetup
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
@@ -593,11 +609,11 @@ end
 
 #------------------------------
 # Output structure
-@with_kw struct VAROutput_CPZ2023 <: BVARmodelOutput
-    store_β::Array{}        # 
-    store_Σt_inv::Array{}        # 
-    store_YY::Array{}
-    M_zsp::Array{} 
+@with_kw struct VAROutput_CPZ2023{T <: AbstractFloat} <: BVARmodelOutput
+    store_β::Array{T}        # 
+    store_Σt_inv::Array{T}        # 
+    store_YY::Array{T}
+    M_zsp::Array{T} 
     z_vec::Array{} 
     Sm_bit::Array{}
     store_Σt::Array{}        # 
