@@ -320,3 +320,55 @@ function get_data_freq(data_tab::TimeArray{T,N,D,A}) where {T<: AbstractFloat, N
     return freq
 end
 
+"""
+    log_p = mixture_log_score(data, eval_point; empirical_weight=0.99)
+
+    Calculate a mixture log score for a vector of data `data` at a `eval_point` based on a kernel density estimate of the data and a fallback broad Normal distribution. Return -1000 if the forecast is far away from the empirical predcitions.
+
+    # Arguments
+    - `data`: A vector of data points used to estimate the kernel density.  
+    - `eval_point`: The new data point for which to calculate the log score.
+    - `empirical_weight`: The weight given to the kernel density estimate in the mixture distribution (default is 0.99).
+    # Returns
+    - `log_p`: scalar, the log score for the new point based on the mixture distribution.   
+
+"""
+function mixture_log_score(data, eval_point; empirical_weight=0.99)
+
+    # Define a fallback broad distribution based on data summary
+    fallback_dist = Distributions.Normal(mean(data), std(data) * 5.0) 
+
+    kde_model = kde(data);
+    # 99% weight to KDE, 1% to the fallback distribution
+    p_empirical = pdf(kde_model, eval_point)
+    p_fallback = pdf(fallback_dist, eval_point)
+    
+    combined_p = (empirical_weight * p_empirical) + ((1.0 - empirical_weight) * p_fallback)
+    log_p = max(-1000.0,log(combined_p))
+    return log_p
+end
+
+@doc raw"""
+    pred_lik_vec = BEAVARs.pred_lik_CCM(forecast_i_vec,true_data_i_vec)
+
+    Calculate the predictive likelihood for a vector of forecasts and a vector of true data points based on the formula in Carriero, Clark and Marcellino (2013) JAE.
+
+    # Arguments
+    - `forecast_i_vec`: A 3D array of forecasts for a single variable across all forecast draws and forecast horizons (dimensions: [horizon, variable, draw]).
+    - `true_data_i_vec`: A vector of true data points for the same variable and forecast horizons (dimension: [horizon]).
+    # Returns
+    - `pred_lik_vec`: A vector of predictive likelihood values for each forecast horizon.
+
+The predictive likelihood is calculated using the formula:
+$$\text{pred\_lik}_t = -0.5 \left( \frac{(y_t - \hat{y}_t)^2}{V_t} + \log(V_t) + \log(2\pi) \right)$$
+where $y_t$ is the true data point, $\hat{y}_t$ is the mean forecast across draws, and $V_t$ is the variance of the forecasts across draws.
+
+This is equation (2) on page 50 of Carriero, Clark and Marcellino (2013) JAE.
+
+Source: Carriero, A., Clark, T. E., & Marcellino, M. (2013). Forecasting with Bayesian vector autoregressions—The role of the prior and the number of observations. Journal of Applied Econometrics, 28(2), 177-203.
+"""
+function pred_lik_CCM(forecast_i_vec,true_data_i_vec)
+    V_i_tph = dropdims(std(forecast_i_vec,dims=3).^2,dims=3)
+    pred_lik_vec=-0.5.*((true_data_i_vec - dropdims(mean(forecast_i_vec,dims=3),dims=3)).^2 ./ V_i_tph .+ log.(V_i_tph) .+ log.(2*π))
+    return pred_lik_vec
+end

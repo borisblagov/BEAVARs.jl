@@ -179,7 +179,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
     
     data_truef_mat = values(data_true_ftab)
     data_true_flags_vec = timestamp(data_true_ftab) .∈  Ref(fdatesLF[end-n_fcst+1:end]) # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of tre data but have only done forecast for 2)
-    forecast_flags_vec = fdatesLF[end-n_fcst+1:end] .∈  Ref(timestamp(data_true_ftab)) # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+    forecast_overlap_vec = fdatesLF[end-n_fcst+1:end] .∈  Ref(timestamp(data_true_ftab)) # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
 
     @views data_true_mat = data_truef_mat[data_true_flags_vec,:]    # this is the true data for our T+1 to T+n_fcst forecasts
     
@@ -202,12 +202,12 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
             YforExp[i_for,:]=tclass'*A_draw;      
         end
 
-        E_fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YforExp[forecast_flags_vec,:];       # fcast error compared to the expectation
+        E_fcast_errors_i = @views data_truef_mat[data_true_flags_vec,:] - YforExp[forecast_overlap_vec,:];       # fcast error compared to the expectation
 
         res = [sqSig\r for r in eachrow(E_fcast_errors_i)]                                # adjusted for the model variance 
-        joint_logdens_3dmat[forecast_flags_vec,:,i_draw] = (-n/2).*log(2*π) .-sum(log.(diag(sqSig))) .- 0.5.*[r'*r for r in eachrow(res)]
+        joint_logdens_3dmat[forecast_overlap_vec,:,i_draw] = (-n/2).*log(2*π) .-sum(log.(diag(sqSig))) .- 0.5.*[r'*r for r in eachrow(res)]
         logdens_vv = [-.5*log.(2*π.*Sig_vec) - 0.5.*(r.^2)./Sig_vec for r in eachrow(E_fcast_errors_i)]
-        logdens_3dmat[forecast_flags_vec,:,i_draw] = reduce(hcat,logdens_vv)';
+        logdens_3dmat[forecast_overlap_vec,:,i_draw] = reduce(hcat,logdens_vv)';
 
     end
 
@@ -217,7 +217,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
     lpl_joint_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(joint_logdens_3dmat.-max_dens),dims=3))+max_dens,dims=3);
 
     Yfor3d = Yfor3D[p+1:end,:,:];
-    fcast_ϵ_mat = dropdims(mean(-(Yfor3d[forecast_flags_vec,:,:] .-  data_truef_mat[data_true_flags_vec,:]),dims=3),dims=3);    # forecast errors
+    fcast_ϵ_mat = dropdims(mean(-(Yfor3d[forecast_overlap_vec,:,:] .-  data_truef_mat[data_true_flags_vec,:]),dims=3),dims=3);    # forecast errors
 
     YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2 = BEAVARs.get_imp_percentiles(Yfor3d); # TODO add the to the output
  

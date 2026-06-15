@@ -8,7 +8,8 @@ using   LinearAlgebra,
         XLSX,
         ThreadSafeDicts,
         Plots,
-        Random
+        Random,
+        KernelDensity
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat
@@ -36,6 +37,7 @@ abstract type BVARmodelHypSetup end     # types for hyperparameters
 abstract type BVARmodelDataSetup end    # types for storing the data unputs to the models
 abstract type BVARmodelLoopSetup end    # type for VAR setup parameters
 abstract type BVARmodelOutput end       # type for output storage
+abstract type BVARmodelEval end       # type for forecast evaluation storage
 abstract type BVARforecastOutput end    # type for forecast output storage
 
 

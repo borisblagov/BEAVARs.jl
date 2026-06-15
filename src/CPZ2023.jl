@@ -1,13 +1,11 @@
-
-
 #-------------------------------------
 # The Den: this is where the beavar lives
 #-------------------------------------
 function beavar(::CPZ2023_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello CPZ2023")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
-    store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
-    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp,M_inter_agg, fdatesHF, fdatesLF);
+    store_YY,store_YY_LF,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit,store_Σt, freq_mix_tp, fdatesHF, fdatesLF = CPZ2023(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
+    out_struct = VAROutput_CPZ2023(store_β,store_Σt_inv,store_YY,store_YY_LF, M_zsp, z_vec, Sm_bit,store_Σt,var_list,freq_mix_tp, fdatesHF, fdatesLF);
     return out_struct
 end
 
@@ -16,9 +14,9 @@ end
 @doc raw"""
     CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hyp_struct)
 
-Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
+    Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
 
-Main function
+    Main function
 
 """
 function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, N, D, A <: AbstractArray{Typ, N}}
@@ -84,38 +82,12 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
             store_Σt[:,:,ii-n_burn] = Σt;
         end
     end
-    
-    return store_YY,store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, M_inter_agg, fdatesHF, fdatesLF
+    store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
+    return store_YY, store_YY_LF, store_β, store_Σt_inv, M_zsp, z_vec, Sm_bit, store_Σt, freq_mix_tp, fdatesHF, fdatesLF
 end
 
 
-
-
-
-function makeHypSetup(::CPZ2023_type)
-    return hypChan2020()
-end
-
-
-# Structure for the datasets and the frequency mix
-@doc raw"""
-    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,var_list::Array{Symbol,1})
-
-Generate a dataset strcture for use with CPZ2023 model
-
-# Arguments
-    dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
-    dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
-
-See also `makeDataSetup`.
-"""
-@with_kw struct dataCPZ2023{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
-    dataHF_tab::TimeArray{T,N,D,A}                                       # data for the high-frequency variables
-    dataLF_tab::TimeArray{T,N,D,A}                                       # data for the low-frequency variables
-    var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
-end
-
+# Data functions
 @doc raw"""
     makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
 
@@ -619,13 +591,14 @@ end
     store_β::Array{T,N}        # 
     store_Σt_inv::Array{T,3}        # 
     store_YY::Array{T,3}
+    store_YY_LF::Array{T,3}
     M_zsp::Array{T,N} 
     z_vec::Array{T,1} 
     Sm_bit::Array{Bool}
     store_Σt::Array{T,3}        # 
     var_list::Array{Symbol,1}
     freq_mix_tp::Tuple{Int,Int,Int}
-    M_inter_agg::Array{T,N}
+    # M_inter_agg::Array{T,N}
     fdatesHF::Array{Date, 1}
     fdatesLF::Array{Date, 1}
 end
@@ -720,4 +693,159 @@ function modelFit(out_struct::VAROutput_CPZ2023,varSetup::BEAVARs.VARSetup)
     return Yfit, Yact
 end
 
+#--------------------------------------
+# forecast evaluation 
+#--------------------------------------
 
+"""
+    eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelDataSetup, set_struct::BVARmodelSetup, dataLF_true_ftab::TimeArray)
+
+    Evaluates the forecasts from the model output against the true values in dataLF_true_ftab. It calculates the predictive likelihood and the mean forecast error for each variable and each forecast horizon.
+
+    Arguments:
+        out_struct: A structure with the model output, including the store_β and YY matrices
+        data_struct: A structure with the data setup, including the dataHF_tab and dataLF_tab
+        set_struct: A structure with the model setup, including n_fcst and p
+        dataLF_true_ftab: A TimeArray with the true values of the low-frequency variables for evaluation
+
+    Returns:
+        pred_lik_mat: A matrix with the predictive likelihood for each evaluated variable and forecast horizon
+        fcast_errors_mean_mat: A matrix with the mean forecast error for each evaluated variable and forecast horizon
+
+    See also:
+        - BEAVARs.pred_lik_CCM() for calculating the predictive likelihood as in Carriero et al 2013 JAE
+
+"""
+function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelDataSetup, set_struct::BVARmodelSetup, dataLF_true_ftab::TimeArray)  
+    @unpack fdatesLF,store_YY, store_YY_LF = out_struct;  
+    @unpack dataHF_tab, dataLF_tab, var_list = data_struct
+    @unpack n_fcst, p, n_save = set_struct
+
+
+    var_list_true = colnames(dataLF_true_ftab);         # list of symbols of variables that will be evaluated
+    data_eval_tab = dataLF_tab[:,var_list_true];        # sorted subset of all low-frequency variable that will be evaluated in the correct order
+
+    no_nan_flag_mat = .!isnan.(values(data_eval_tab));  # whether in the low-frequency data we have missing values, in the order of the variables in the true table (i.e. unbalanced panel for the low-freq variable)
+    # if no_nan_flag_mat is the same across all variables, we can do the evaluation for all variables at the same time, otherwise we need to do it separately for each variable
+    data_truef_mat = values(dataLF_true_ftab);
+    datesLF_true = timestamp(dataLF_true_ftab)
+    n_fvar = size(dataLF_true_ftab,2)                   # evaluating forecasts only for the variables for which we have true data
+    # logdensKDE_3dmat = fill(NaN,(n_fcst,n_fvar));   # houses the log-density of each evaluated variable and forecast horizon
+    datesLF = timestamp(data_eval_tab);
+
+    pred_lik_mat = fill(NaN,(n_fcst,n_fvar));   # houses the predictive likelihood for each evaluated variable and forecast horizon
+    fcast_errors_mean_mat = fill(NaN,(n_fcst,n_fvar));   # houses the mean forecast error for each evaluated variable and forecast horizon
+
+
+    if allequal(eachcol(no_nan_flag_mat))
+        locs = [findfirst(==(s), var_list) for s in var_list_true]
+        obs_datesLF = datesLF[no_nan_flag_mat[:,1]];    # dates for which we have obs, everthing else is forecast, we may simply take the first column as we checked they are all equal
+        fcast_flags = fdatesLF .∉  Ref(obs_datesLF);        # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
+        fcast_datesLF = fdatesLF[fcast_flags];              # corresponding dates 
+
+        data_true_flags_vec = datesLF_true .∈  Ref(fcast_datesLF)           # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
+        fcastDatesOverlap = fcast_datesLF[fcast_datesLF .∈  Ref(datesLF_true)]    # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+        fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)          # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+
+        # this is the true data for our T+1 to T+n_fcst forecasts
+        @views data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    
+
+        # these are the relevant forecasts
+        @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
+        fcast_errors_mat = data_true_VecView .- fcast_YY_view
+
+        fcast_errors_mean_mat[:,:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
+
+        # predictive likelihood as in Carriero et al 2013 JAE
+        pred_lik_mat[:,:] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_VecView)
+        
+    else
+        # TODO finish this for the case where the dataLF_tab is unbalanced
+        for i_var = 1:n_fvar
+            i_var_sym = var_list_true[i_var];                               # symbol of the variable for which we will evaluate
+            i_var_storeYY_loc = i_var_sym.==var_list;                        # location of the variable to evaluate in store_YY_LF
+
+            obs_datesLF_i_var = datesLF[no_nan_flag_mat[:,i_var]];    # dates for which we have obs, everthing else is forecast
+            fcast_flags_i_var = fdatesLF .∉  Ref(obs_datesLF_i_var);        # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
+            fcast_datesLF_i_var = fdatesLF[fcast_flags_i_var];              # corresponding dates 
+
+            data_true_flags_i_var_vec = datesLF_true .∈  Ref(fcast_datesLF_i_var)           # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
+            fcastDatesOverlap_i_var = fcast_datesLF_i_var[fcast_datesLF_i_var .∈  Ref(datesLF_true)]    # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+            fcastDatesOverlap_i_var_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap_i_var)          # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+
+            # this is the true data for our T+1 to T+n_fcst forecasts
+            @views data_true_i_var_VecView = data_truef_mat[data_true_flags_i_var_vec,i_var]    
+
+            # these are the relevant forecasts
+            @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_i_var_BitVec,i_var_storeYY_loc,:]
+            fcast_errors_i_var = data_true_i_var_VecView .- fcast_YY_view
+
+
+            # h_eval = size(fcast_YY_view,1);     # number of forecasts for i_var (must be less or equal to n_fcst)
+            # for ii = 1:h_eval
+            #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY_view[ii,:,:]),data_true_i_var_VecView[ii])
+            # end
+            fcast_errors_mean_mat[:,i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
+
+            # predictive likelihood as in Carriero et al 2013 JAE
+            pred_lik_mat[:,i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
+        end
+    end
+    
+    evalCPZ2023_struct = BEAVARs.evalCPZ2023(pred_lik_mat, fcast_errors_mean_mat)
+    return evalCPZ2023_struct
+end
+
+
+##--------------------------------------
+#
+#   CONSTRUCTORS
+#
+#--------------------------------------
+
+# Hyperparameters structure
+"""
+    makeHypSetup(::CPZ2023_type)
+
+    Constructs the structure with the hyperparameters for the CPZ2023 model. Calls the function hypChan2020() that initializes the hyperparameters as in Chan 2020, but in the future we might want to add more options for different hyperparameter settings.
+
+    Arguments:
+        ::CPZ2023_type: A type that indicates that we want to use the CPZ2023 model. This is a dummy argument that is used to dispatch on the type of model we want to use.
+
+    Returns:
+        A structure with the hyperparameters for the CPZ2023 model, currently initialized as in Chan 2020.
+
+    See also:
+        - hypChan2020() for initializing the hyperparameters as in Chan 2020.
+"""
+function makeHypSetup(::CPZ2023_type)
+    return hypChan2020()
+end
+
+
+# Structure for the datasets and the frequency mix
+@doc raw"""
+    dataCPZ2023(data_HF::TimeArray,data_LF::TimeArray,var_list::Array{Symbol,1})
+
+Generate a dataset strcture for use with CPZ2023 model
+
+# Arguments
+    dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
+    dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
+    var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
+
+See also `makeDataSetup`.
+"""
+@with_kw struct dataCPZ2023{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    dataHF_tab::TimeArray{T,N,D,A}                                       # data for the high-frequency variables
+    dataLF_tab::TimeArray{T,N,D,A}                                       # data for the low-frequency variables
+    var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
+end
+
+
+"""
+"""
+struct evalCPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
+    pred_lik_mat::Array{T,N}  
+    fcast_errors_mean_mat::Array{T,N}
+end
