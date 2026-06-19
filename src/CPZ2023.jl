@@ -748,10 +748,10 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
         fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)               # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
 
         # this is the true data for our T+1 to T+n_fcst forecasts
-        @views data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    
+        data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    
 
         # these are the relevant forecasts
-        @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
+        fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
         fcast_errors_mat = data_true_VecView .- fcast_YY_view
 
         fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
@@ -761,39 +761,41 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
         
     else
         # TODO finish this for the case where the dataLF_tab is unbalanced
-        for i_var = 1:n_fvar
-            i_var_sym = var_list_true[i_var];                               # symbol of the variable for which we will evaluate
-            i_var_storeYY_loc = i_var_sym.==var_list;                        # location of the variable to evaluate in store_YY_LF
+        # for i_var = 1:n_fvar
+        #     i_var_sym = var_list_true[i_var];                               # symbol of the variable for which we will evaluate
+        #     i_var_storeYY_loc = i_var_sym.==var_list;                        # location of the variable to evaluate in store_YY_LF
 
-            obs_datesLF_i_var = datesLF[no_nan_flag_mat[:,i_var]];    # dates for which we have obs, everthing else is forecast
-            fcast_flags_i_var = fdatesLF .∉  Ref(obs_datesLF_i_var);        # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
-            fcast_datesLF_i_var = fdatesLF[fcast_flags_i_var];              # corresponding dates 
+        #     obs_datesLF_i_var = datesLF[no_nan_flag_mat[:,i_var]];    # dates for which we have obs, everthing else is forecast
+        #     fcast_flags_i_var = fdatesLF .∉  Ref(obs_datesLF_i_var);        # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
+        #     fcast_datesLF_i_var = fdatesLF[fcast_flags_i_var];              # corresponding dates 
 
-            data_true_flags_i_var_vec = datesLF_true .∈  Ref(fcast_datesLF_i_var)           # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
-            fcastDatesOverlap_i_var = fcast_datesLF_i_var[fcast_datesLF_i_var .∈  Ref(datesLF_true)]    # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
-            fcastDatesOverlap_i_var_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap_i_var)          # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+        #     data_true_flags_i_var_vec = datesLF_true .∈  Ref(fcast_datesLF_i_var)           # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
+        #     fcastDatesOverlap_i_var = fcast_datesLF_i_var[fcast_datesLF_i_var .∈  Ref(datesLF_true)]    # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+        #     fcastDatesOverlap_i_var_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap_i_var)          # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
 
-            # this is the true data for our T+1 to T+n_fcst forecasts
-            @views data_true_i_var_VecView = data_truef_mat[data_true_flags_i_var_vec,i_var]    
+        #     # this is the true data for our T+1 to T+n_fcst forecasts
+        #     @views data_true_i_var_VecView = data_truef_mat[data_true_flags_i_var_vec,i_var]    
 
-            # these are the relevant forecasts
-            @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_i_var_BitVec,i_var_storeYY_loc,:]
-            fcast_errors_i_var = data_true_i_var_VecView .- fcast_YY_view
+        #     # these are the relevant forecasts
+        #     @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_i_var_BitVec,i_var_storeYY_loc,:]
+        #     fcast_errors_i_var = data_true_i_var_VecView .- fcast_YY_view
 
 
-            # h_eval = size(fcast_YY_view,1);     # number of forecasts for i_var (must be less or equal to n_fcst)
-            # for ii = 1:h_eval
-            #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY_view[ii,:,:]),data_true_i_var_VecView[ii])
-            # end
-            fcast_errors_mAd_mat[1:size(fcast_errors_i_var,1),i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
+        #     # h_eval = size(fcast_YY_view,1);     # number of forecasts for i_var (must be less or equal to n_fcst)
+        #     # for ii = 1:h_eval
+        #     #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY_view[ii,:,:]),data_true_i_var_VecView[ii])
+        #     # end
+        #     fcast_errors_mAd_mat[1:size(fcast_errors_i_var,1),i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
 
-            # predictive likelihood as in Carriero et al 2013 JAE
-            pred_lik_mat[1:size(fcast_errors_i_var,1),i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
-        end
+        #     # predictive likelihood as in Carriero et al 2013 JAE
+        #     pred_lik_mat[1:size(fcast_errors_i_var,1),i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
+        # end
     end
     
-    eval_vint_CPZ2023_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat)
-    return eval_vint_CPZ2023_struct
+    # TODO this works only for the balanced case (the first one above)
+    data_true_dates = datesLF_true[data_true_flags_vec];
+    
+    eval_vint_CPZ2023_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates)
 end
 
 
@@ -849,4 +851,7 @@ end
 struct eval_vint_CPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
     pred_lik_mat::Array{T,N}  
     fcast_errors_mAd_mat::Array{T,N}
+    fcastDatesOverlap::Array{Date,1}
+    data_true_VecView::Array{T,N}
+    data_true_dates::Array{Date,1}
 end

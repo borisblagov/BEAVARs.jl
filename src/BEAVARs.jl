@@ -10,6 +10,7 @@ using   LinearAlgebra,
         Plots,
         Random,
         KernelDensity,
+        Tables,
         PrettyTables
 
 # from init_functions.jl
