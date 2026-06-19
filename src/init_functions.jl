@@ -293,6 +293,26 @@ end
 
 _nanfunc(f, A, ::Colon) = f(filter(!isnan, A))
 _nanfunc(f, A, dims) = mapslices(a->_nanfunc(f,a,:), A, dims=dims)
+"""
+    nanfunc(f, A; dims=:)
+
+    Applies a function `f` to the elements of `A`, ignoring NaN values. If `dims` is specified, the function is applied along the specified dimensions.
+
+    # Arguments:
+        f: Function to apply (e.g., mean, sum, etc.)
+        A: Input array
+        dims: Dimensions along which to apply the function (default is `:` for all elements)
+
+    # Returns:
+        Result of applying `f` to `A` with NaN values ignored.
+
+    # usage
+        ```
+        BEAVARs.nanfunc(sum, sfe_mat; dims=2)
+        ```
+        would calculate the sum of a matrix `sfe_mat` along its second dimension by omitting nans
+
+"""
 nanfunc(f, A; dims=:) = _nanfunc(f, A, dims)
 
 

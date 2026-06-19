@@ -4,6 +4,22 @@ end
 
 
 
+#-------------------------------------
+# The Den: this is where the beavars live
+#-------------------------------------
+
+@doc raw"""
+    Main function for Blagov2025
+"""
+function beavar(::Blagov2025_type, set_struct, hyp_struct, data_struct)
+    println("Hello Blagov2025")
+    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
+    out_struct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF)
+    return out_struct
+end
+
+
 # Structure for the datasets and the frequency mix
 @doc raw"""
     dataBlagov2025(data_HF::TimeArray,data_LF::TimeArray,prior_RW::Int,var_list::Array{Symbol,1})

@@ -9,7 +9,8 @@ using   LinearAlgebra,
         ThreadSafeDicts,
         Plots,
         Random,
-        KernelDensity
+        KernelDensity,
+        PrettyTables
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat
@@ -82,10 +83,10 @@ end
     
 """
 @with_kw struct LoopSetup <: BVARmodelLoopSetup
-    model::BVARmodelType
-    set::BVARmodelSetup
-    hyp::BVARmodelHypSetup
-    data::BVARmodelDataSetup
+    model_type::BVARmodelType
+    set_struct::BVARmodelSetup
+    hyp_struct::BVARmodelHypSetup
+    data_struct::BVARmodelDataSetup
 end
 
 
@@ -180,11 +181,11 @@ function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,
 end
 
 function unpackLoopSetup(loop_struct::BVARmodelLoopSetup)
-    @unpack model, set, hyp, data,  = loop_struct 
-    model_type = model;
-    set_struct = set;
-    hyp_struct = hyp;
-    data_struct = data;
+    @unpack model_type, set_struct, hyp_struct, data_struct,  = loop_struct 
+    # model_type = model;
+    # set_struct = set_struct;
+    # hyp_struct = hyp_struct;
+    # data_struct = data_struct;
     return model_type, set_struct, hyp_struct, data_struct
 end
 
@@ -228,43 +229,6 @@ include("plot_functions.jl")
 # The Den: this is where the beavars live
 #-------------------------------------
 
-
-
-
-@doc raw"""
-    Main function for Chan2020csv
-"""
-function beavar(::Chan2020csv_type, set_struct, hyp_str, data_struct)
-    println("Hello Minn CSV")
-    YY = values(data_struct.data_tab);
-    store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyp_str);
-    out_struct = VAROutput_Chan2020csv(store_β,store_Σ,store_h,s2_h_store, store_ρ, store_σ_h2, store_eh,YY)
-    return out_struct
-end
-
-
-
-
-@doc raw"""
-    Main function for Blagov2025
-"""
-function beavar(::Blagov2025_type, set_struct, hyp_struct, data_struct)
-    println("Hello Blagov2025")
-    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
-    store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF = Blagov2025(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
-    out_struct = VAROutput_Blagov2025(store_β, store_Σt_inv, store_YY, M_zsp, z_vec, Sm_bit, freq_mix_tp, store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, M_inter_agg, fdatesHF, fdatesLF)
-    return out_struct
-end
-
-
-function beavar(::BGR2010_type, set_struct, hyp_struct, data_struct)
-    println("Hello BGR2010")
-    YY = values(data_struct.data_tab);
-    store_β, store_Σ = BGR2010(YY,set_struct,hyp_struct);
-    out_struct = VAROutput_BGR2010(store_β,store_Σ,YY);
-    return out_struct
-end
-
 function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
     fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
@@ -289,8 +253,9 @@ function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
     Threads.@threads for index in ks
         # println("$index $value")
         println("Estimating data vintage $index")
-        value=vint_in_dict[index];
-        model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
+        # value=vint_in_dict[index];
+        @unpack model_type, set_struct, hyp_struct, data_struct,  = vint_in_dict[index];
+        # model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
         out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
         fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
         vint_out_dict[index] = out_struct;
@@ -298,6 +263,46 @@ function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
     end
     
     return vint_out_dict, fcast_out_dict
+end
+
+"""
+        eval_vint_dict, FEvint_mean_mat, list_keys = beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String, BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+
+        Evaluate the forecasts of the models in vint_out_dict against the true values in dataLF_true_ftab.
+"""
+function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+    eval_vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelEval}()
+    ks = collect(keys(vint_out_dict))
+    n_eval = length(ks)
+    n_fcast = vint_dict[ks[1]].set_struct.n_fcst;
+    fe_mat=fill(NaN,n_fcast,n_eval)
+    pred_lik_mat=fill(NaN,n_fcast,n_eval)
+    list_keys = String[]
+    
+    for index in ks
+        println("Evaluating $index")
+        eval_vint_dict[index] = BEAVARs.eval_forecast(vint_out_dict[index], vint_dict[index].data_struct, vint_dict[index].set_struct, dataLF_true_ftab)
+        fe_mat[:,ks.==index] = eval_vint_dict[index].fcast_errors_mAd_mat
+        pred_lik_mat[:,ks.==index] = eval_vint_dict[index].pred_lik_mat
+        push!(list_keys, index)
+    end
+
+    sfe_mat = fe_mat.^2;     # squared forecast error matrix
+    ae_mat  = abs.(fe_mat);  # absolute forecast error matrix
+
+    # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
+    apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat; dims=2),dims=2); # average predictive likelihood 
+
+    msfe_vec = dropdims(BEAVARs.nanfunc(sum, sfe_mat; dims=2),dims=2)
+    mafe_vec = dropdims(BEAVARs.nanfunc(sum, ae_mat; dims=2),dims=2)
+    rmsfe_vec = sqrt.(msfe_vec);
+    rmafe_vec = sqrt.(mafe_vec);
+
+    h_values = ["T+$i" for i in 1:n_fcast]
+    fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
+    pretty_table(fe_tab)
+
+    return fe_tab, fe_mat, pred_lik_mat, list_keys, eval_vint_dict
 end
 
 

@@ -616,11 +616,11 @@ end
 """
 function forecast(VAROutput::VAROutput_CPZ2023,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     # TODO change these lines to using the function get_imp_percentiles
-    @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
+    @unpack store_β, store_Σt, store_YY, store_YY_LF, fdatesHF, fdatesLF = VAROutput
     @unpack n_fcst,p,n_save = VARSetup
     @unpack dataHF_tab, dataLF_tab, var_list = data_struct
     YYforHF3d = store_YY;
-    YYforLF3d = mapslices(x->M_inter_agg*x,store_YY,dims=1:2)
+    YYforLF3d = store_YY_LF
 
     # Calculate the percentiles for the forecast distribution for the low frequency and high-frequency variables
     YforLF_low1 = percentile_mat(YYforLF3d,0.05,dims=3);
@@ -733,19 +733,19 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
     # logdensKDE_3dmat = fill(NaN,(n_fcst,n_fvar));   # houses the log-density of each evaluated variable and forecast horizon
     datesLF = timestamp(data_eval_tab);
 
-    pred_lik_mat = fill(NaN,(n_fcst,n_fvar));   # houses the predictive likelihood for each evaluated variable and forecast horizon
-    fcast_errors_mean_mat = fill(NaN,(n_fcst,n_fvar));   # houses the mean forecast error for each evaluated variable and forecast horizon
+    pred_lik_mat = fill(NaN,(n_fcst,n_fvar));           # houses the predictive likelihood for each evaluated variable and forecast horizon
+    fcast_errors_mAd_mat = fill(NaN,(n_fcst,n_fvar));   # houses the forecast error for each evaluated variable and forecast horizon, mean over all draws
 
 
     if allequal(eachcol(no_nan_flag_mat))
         locs = [findfirst(==(s), var_list) for s in var_list_true]
-        obs_datesLF = datesLF[no_nan_flag_mat[:,1]];    # dates for which we have obs, everthing else is forecast, we may simply take the first column as we checked they are all equal
-        fcast_flags = fdatesLF .∉  Ref(obs_datesLF);        # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
-        fcast_datesLF = fdatesLF[fcast_flags];              # corresponding dates 
+        obs_datesLF = datesLF[no_nan_flag_mat[:,1]];                    # dates for which we have obs, everthing else is forecast, we may simply take the first column as we checked they are all equal
+        fcast_flags = fdatesLF .∉  Ref(obs_datesLF);                    # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
+        fcast_datesLF = fdatesLF[fcast_flags];                          # corresponding dates 
 
-        data_true_flags_vec = datesLF_true .∈  Ref(fcast_datesLF)           # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
-        fcastDatesOverlap = fcast_datesLF[fcast_datesLF .∈  Ref(datesLF_true)]    # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
-        fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)          # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+        data_true_flags_vec = datesLF_true .∈  Ref(fcast_datesLF)                   # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
+        fcastDatesOverlap = fcast_datesLF[fcast_datesLF .∈  Ref(datesLF_true)]      # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+        fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)               # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
 
         # this is the true data for our T+1 to T+n_fcst forecasts
         @views data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    
@@ -754,10 +754,10 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
         @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
         fcast_errors_mat = data_true_VecView .- fcast_YY_view
 
-        fcast_errors_mean_mat[:,:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
+        fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
 
         # predictive likelihood as in Carriero et al 2013 JAE
-        pred_lik_mat[:,:] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_VecView)
+        pred_lik_mat[1:size(fcast_errors_mat,1),:] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_VecView)
         
     else
         # TODO finish this for the case where the dataLF_tab is unbalanced
@@ -785,15 +785,15 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
             # for ii = 1:h_eval
             #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY_view[ii,:,:]),data_true_i_var_VecView[ii])
             # end
-            fcast_errors_mean_mat[:,i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
+            fcast_errors_mAd_mat[1:size(fcast_errors_i_var,1),i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
 
             # predictive likelihood as in Carriero et al 2013 JAE
-            pred_lik_mat[:,i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
+            pred_lik_mat[1:size(fcast_errors_i_var,1),i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
         end
     end
     
-    evalCPZ2023_struct = BEAVARs.evalCPZ2023(pred_lik_mat, fcast_errors_mean_mat)
-    return evalCPZ2023_struct
+    eval_vint_CPZ2023_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat)
+    return eval_vint_CPZ2023_struct
 end
 
 
@@ -844,8 +844,9 @@ end
 
 
 """
+    Houses the forecast errors, averaged across draws and predictive likelihood for a specific vintage
 """
-struct evalCPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
+struct eval_vint_CPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
     pred_lik_mat::Array{T,N}  
-    fcast_errors_mean_mat::Array{T,N}
+    fcast_errors_mAd_mat::Array{T,N}
 end

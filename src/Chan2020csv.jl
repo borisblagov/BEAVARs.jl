@@ -1,3 +1,17 @@
+#-------------------------------------
+# The Den: this is where the beavars live
+#-------------------------------------
+
+@doc raw"""
+    Main function for Chan2020csv
+"""
+function beavar(::Chan2020csv_type, set_struct, hyp_str, data_struct)
+    println("Hello Minn CSV")
+    YY = values(data_struct.data_tab);
+    store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyp_str);
+    out_struct = VAROutput_Chan2020csv(store_β,store_Σ,store_h,s2_h_store, store_ρ, store_σ_h2, store_eh,YY)
+    return out_struct
+end
 
 
 

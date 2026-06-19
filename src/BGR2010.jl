@@ -1,6 +1,20 @@
 #-----------------------------------------------
 # Banbura et al. 2010 LBA functions
 
+
+#-------------------------------------
+# The Den: this is where the beavars live
+#-------------------------------------
+
+
+function beavar(::BGR2010_type, set_struct, hyp_struct, data_struct)
+    println("Hello BGR2010")
+    YY = values(data_struct.data_tab);
+    store_β, store_Σ = BGR2010(YY,set_struct,hyp_struct);
+    out_struct = VAROutput_BGR2010(store_β,store_Σ,YY);
+    return out_struct
+end
+
 function makeHypSetup(::BGR2010_type)
     return hypBGR2010()
 end
