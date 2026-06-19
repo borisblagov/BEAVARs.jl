@@ -752,6 +752,7 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
 
         # these are the relevant forecasts
         fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
+        fcast_YY_mat = dropdims(mean(fcast_YY_view,dims=3),dims=3);
         fcast_errors_mat = data_true_VecView .- fcast_YY_view
 
         fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
@@ -796,6 +797,8 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
     data_true_dates = datesLF_true[data_true_flags_vec];
     
     eval_vint_CPZ2023_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates)
+    # eval_vint_CPZ2023_SA_struct = BEAVARs.eval_vint_CPZ2023_SA(pred_lik_mat, fcast_errors_mAd_mat,data_true_VecView,fcast_YY_mat)
+    return eval_vint_CPZ2023_struct
 end
 
 
@@ -855,3 +858,16 @@ struct eval_vint_CPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
     data_true_VecView::Array{T,N}
     data_true_dates::Array{Date,1}
 end
+
+
+# """
+#     Houses the forecast errors, averaged across draws and predictive likelihood for a specific vintage
+# """
+# struct eval_vint_CPZ2023_SA{T <: AbstractFloat, N} <: BVARmodelEval
+#     pred_lik_mat::Array{T,N}  
+#     fcast_errors_mAd_mat::Array{T,N}
+#     # fcastDatesOverlap::Array{Date,1}
+#     data_true_VecView::Array{T,N}
+#     fcast_YY_view::Array{T,N}
+#     # data_true_dates::Array{Date,1}
+# end
