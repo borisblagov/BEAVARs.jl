@@ -73,6 +73,9 @@ julia> hf_ta = BEAVARs.TAtrans(dataHF_TA, varList_HF, trans_dictA)
 │ 2020-06-01 │ 0.174958 │ 0.00672888 │ -0.169349 │
 └────────────┴──────────┴────────────┴───────────┘
 ```
+
+Dev note: The function will always delete the first observation of the high frequency variable, even if you are working in levels. Thus you can compare models with growth rates with models in log-levels with the same information set.
+
 """
 function TAtrans(dataHF_TA,varList_HF,trans_dictA)
 transHF_vec = getindex.(Ref(trans_dictA),varList_HF);       # vector of transformations for the vars
@@ -332,6 +335,7 @@ end
     # Returns
     - `log_p`: scalar, the log score for the new point based on the mixture distribution.   
 
+    # dev notes: currently it is not used
 """
 function mixture_log_score(data, eval_point; empirical_weight=0.99)
 

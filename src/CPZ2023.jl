@@ -717,15 +717,22 @@ end
 
 """
 function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelDataSetup, set_struct::BVARmodelSetup, dataLF_true_ftab::TimeArray)  
-    @unpack fdatesLF,store_YY, store_YY_LF = out_struct;  
-    @unpack dataHF_tab, dataLF_tab, var_list = data_struct
+    @unpack fdatesLF,store_YY_LF,freq_mix_tp = out_struct;  
+    @unpack dataLF_tab, var_list = data_struct
     @unpack n_fcst, p, n_save = set_struct
 
+    # check if we are working in levels to transform the true data to growth rates for evaluation
+    if freq_mix_tp[3] == 1
+        dataLF_tab = percentchange(dataLF_tab);
+        dataLF_true_ftab = percentchange(dataLF_true_ftab);
+        fdatesLF = out_struct.fdatesLF[2:end];              # we lose the first date when we take growth rates, so we need to adjust the forecast dates accordingly
+        store_YY_LF = out_struct.store_YY_LF[2:end,:,:]./out_struct.store_YY_LF[1:end-1,:,:].-1;
+    end
 
-    var_list_true = colnames(dataLF_true_ftab);         # list of symbols of variables that will be evaluated
-    data_eval_tab = dataLF_tab[:,var_list_true];        # sorted subset of all low-frequency variable that will be evaluated in the correct order
+    var_list_true = colnames(dataLF_true_ftab);             # list of symbols of variables that will be evaluated
+    data_eval_tab = dataLF_tab[:,var_list_true];            # sorting a subset of all low-frequency variables so that they will be evaluated in the correct order
 
-    no_nan_flag_mat = .!isnan.(values(data_eval_tab));  # whether in the low-frequency data we have missing values, in the order of the variables in the true table (i.e. unbalanced panel for the low-freq variable)
+    no_nan_flag_mat = .!isnan.(values(data_eval_tab));      # whether in the low-frequency data we have missing values, in the order of the variables in the true table (i.e. unbalanced panel for the low-freq variable)
     # if no_nan_flag_mat is the same across all variables, we can do the evaluation for all variables at the same time, otherwise we need to do it separately for each variable
     data_truef_mat = values(dataLF_true_ftab);
     datesLF_true = timestamp(dataLF_true_ftab)
@@ -748,17 +755,17 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
         fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)               # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
 
         # this is the true data for our T+1 to T+n_fcst forecasts
-        data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    
+        data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    # select only the variables that we want to evaluate and only the relevant time periods
 
         # these are the relevant forecasts
-        fcast_YY_view =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
-        fcast_YY_mat = dropdims(mean(fcast_YY_view,dims=3),dims=3);
-        fcast_errors_mat = data_true_VecView .- fcast_YY_view
+        fcast_YY =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
+        fcast_YY_mat = dropdims(mean(fcast_YY,dims=3),dims=3);
+        fcast_errors_mat = data_true_VecView .- fcast_YY
 
         fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
 
         # predictive likelihood as in Carriero et al 2013 JAE
-        pred_lik_mat[1:size(fcast_errors_mat,1),:] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_VecView)
+        pred_lik_mat[1:size(fcast_errors_mat,1),:] = BEAVARs.pred_lik_CCM(fcast_YY,data_true_VecView)
         
     else
         # TODO finish this for the case where the dataLF_tab is unbalanced
@@ -778,18 +785,18 @@ function eval_forecast(out_struct::VAROutput_CPZ2023, data_struct::BVARmodelData
         #     @views data_true_i_var_VecView = data_truef_mat[data_true_flags_i_var_vec,i_var]    
 
         #     # these are the relevant forecasts
-        #     @views fcast_YY_view =  store_YY_LF[fcastDatesOverlap_i_var_BitVec,i_var_storeYY_loc,:]
-        #     fcast_errors_i_var = data_true_i_var_VecView .- fcast_YY_view
+        #     @views fcast_YY =  store_YY_LF[fcastDatesOverlap_i_var_BitVec,i_var_storeYY_loc,:]
+        #     fcast_errors_i_var = data_true_i_var_VecView .- fcast_YY
 
 
-        #     # h_eval = size(fcast_YY_view,1);     # number of forecasts for i_var (must be less or equal to n_fcst)
+        #     # h_eval = size(fcast_YY,1);     # number of forecasts for i_var (must be less or equal to n_fcst)
         #     # for ii = 1:h_eval
-        #     #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY_view[ii,:,:]),data_true_i_var_VecView[ii])
+        #     #     logdensKDE_3dmat[ii,i_var] =BEAVARs.mixture_log_score(vec(fcast_YY[ii,:,:]),data_true_i_var_VecView[ii])
         #     # end
         #     fcast_errors_mAd_mat[1:size(fcast_errors_i_var,1),i_var] = dropdims(mean(fcast_errors_i_var,dims=3),dims=3);   # mean forecast error across draws
 
         #     # predictive likelihood as in Carriero et al 2013 JAE
-        #     pred_lik_mat[1:size(fcast_errors_i_var,1),i_var] = BEAVARs.pred_lik_CCM(fcast_YY_view,data_true_i_var_VecView)
+        #     pred_lik_mat[1:size(fcast_errors_i_var,1),i_var] = BEAVARs.pred_lik_CCM(fcast_YY,data_true_i_var_VecView)
         # end
     end
     
@@ -868,6 +875,6 @@ end
 #     fcast_errors_mAd_mat::Array{T,N}
 #     # fcastDatesOverlap::Array{Date,1}
 #     data_true_VecView::Array{T,N}
-#     fcast_YY_view::Array{T,N}
+#     fcast_YY::Array{T,N}
 #     # data_true_dates::Array{Date,1}
 # end
