@@ -105,12 +105,12 @@ end
 end
 
 # Structure to hold the median, 68% and 95% percentiles of the forecasts for a VAR
-@with_kw struct data_fcast_PI <: BVARmodelDataSetup
-    YYfor_low05_tab::TimeArray         
-    YYfor_low16_tab::TimeArray         
-    YYfor_med_tab::TimeArray         
-    YYfor_hih84_tab::TimeArray
-    YYfor_hih95_tab::TimeArray
+@with_kw struct data_fcast_PI{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    YYfor_low05_tab::TimeArray{T,N,D,A}         
+    YYfor_low16_tab::TimeArray{T,N,D,A}         
+    YYfor_med_tab::TimeArray{T,N,D,A}         
+    YYfor_hih84_tab::TimeArray{T,N,D,A}
+    YYfor_hih95_tab::TimeArray{T,N,D,A}
 end
 
 @with_kw struct VARSetup <: BVARmodelSetup
@@ -146,6 +146,15 @@ end
     forecast_flags_vec::BitVector          # bit vector showing the position of the low-frequency forecasts in the output
 end
 
+
+@with_kw struct EvalForecast{T<:AbstractFloat,N} <: BVARmodelEval
+    fe_mat::Array{T,N}          # forecast errors matrix
+    sfe_mat::Array{T,N}          # forecast errors matrix
+    ae_mat::Array{T,N}          # forecast errors matrix
+    pred_lik_mat::Array{T,N}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x n_save
+    list_keys::Vector{String,}      # High frequency dataset in a TimeArray format   
+    list_dates::Vector{Date,}      # Low frequency dataset in a TimeArray format 
+end
 
 
 @doc raw"""
@@ -279,6 +288,7 @@ function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutp
     fe_mat=fill(NaN,n_fcast,n_eval)
     pred_lik_mat=fill(NaN,n_fcast,n_eval)
     list_keys = String[]
+    list_dates = Date[]
     
     for index in ks
         println("Evaluating $index")
@@ -286,6 +296,7 @@ function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutp
         fe_mat[:,ks.==index] = eval_vint_dict[index].fcast_errors_mAd_mat
         pred_lik_mat[:,ks.==index] = eval_vint_dict[index].pred_lik_mat
         push!(list_keys, index)
+        push!(list_dates,eval_vint_dict[index].data_true_dates[1])
     end
 
     sfe_mat = fe_mat.^2;     # squared forecast error matrix
@@ -303,7 +314,17 @@ function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutp
     fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
     pretty_table(fe_tab)
 
-    return fe_tab, fe_mat, pred_lik_mat, list_keys, eval_vint_dict
+    sort_ind            = sortperm(list_dates);
+    list_dates_sort     = list_dates[sort_ind];
+    list_keys_sort      = list_keys[sort_ind];
+    fe_mat_sort         = fe_mat[:,sort_ind];
+    sfe_mat_sort        = sfe_mat[:,sort_ind];
+    ae_mat_sort        = ae_mat[:,sort_ind];
+    pred_lik_mat_sort   = pred_lik_mat[:,sort_ind]
+
+    eval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
+
+    return fe_tab, eval_vint_dict, fe_mat, pred_lik_mat, list_keys, list_dates, eval_struct
 end
 
 
