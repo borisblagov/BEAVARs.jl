@@ -149,11 +149,11 @@ end
 
 @with_kw struct EvalForecast{T<:AbstractFloat,N} <: BVARmodelEval
     fe_mat::Array{T,N}          # forecast errors matrix
-    sfe_mat::Array{T,N}          # forecast errors matrix
+    sfe_mat::Array{T,N}         # forecast errors matrix
     ae_mat::Array{T,N}          # forecast errors matrix
-    pred_lik_mat::Array{T,N}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x n_save
-    list_keys::Vector{String,}      # High frequency dataset in a TimeArray format   
-    list_dates::Vector{Date,}      # Low frequency dataset in a TimeArray format 
+    pred_lik_mat::Array{T,N}          
+    list_keys::Vector{String,}      
+    list_dates::Vector{Date,}      
 end
 
 
@@ -280,7 +280,7 @@ end
 
         Evaluate the forecasts of the models in vint_out_dict against the true values in dataLF_true_ftab.
 """
-function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
     eval_vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelEval}()
     ks = collect(keys(vint_out_dict))
     n_eval = length(ks)
@@ -302,17 +302,17 @@ function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutp
     sfe_mat = fe_mat.^2;     # squared forecast error matrix
     ae_mat  = abs.(fe_mat);  # absolute forecast error matrix
 
-    # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
-    apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat; dims=2),dims=2); # average predictive likelihood 
+    # # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
+    # apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat; dims=2),dims=2); # average predictive likelihood 
 
-    msfe_vec = dropdims(BEAVARs.nanfunc(sum, sfe_mat; dims=2),dims=2)
-    mafe_vec = dropdims(BEAVARs.nanfunc(sum, ae_mat; dims=2),dims=2)
-    rmsfe_vec = sqrt.(msfe_vec);
-    rmafe_vec = sqrt.(mafe_vec);
+    # msfe_vec = dropdims(BEAVARs.nanfunc(sum, sfe_mat; dims=2),dims=2)
+    # mafe_vec = dropdims(BEAVARs.nanfunc(sum, ae_mat; dims=2),dims=2)
+    # rmsfe_vec = sqrt.(msfe_vec);
+    # rmafe_vec = sqrt.(mafe_vec);
 
-    h_values = ["T+$i" for i in 1:n_fcast]
-    fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
-    pretty_table(fe_tab)
+    # h_values = ["T+$i" for i in 1:n_fcast]
+    # fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
+    # pretty_table(fe_tab)
 
     sort_ind            = sortperm(list_dates);
     list_dates_sort     = list_dates[sort_ind];
@@ -324,9 +324,45 @@ function beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutp
 
     eval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
 
-    return fe_tab, eval_vint_dict, fe_mat, pred_lik_mat, list_keys, list_dates, eval_struct
+    return eval_struct
 end
 
+"""
+    eval_forecasts(eval_struct)
+
+
+
+"""
+function eval_forecasts(eval_struct; drop_dates = Date[])
+    @unpack list_dates, list_keys, fe_mat, sfe_mat, ae_mat, pred_lik_mat =  eval_struct
+
+    if typeof(drop_dates)<:Date                             # check if the date supplied is a vector of dates (multiple) or only one, then convert it to Vector
+        drop_dates = [drop_dates]
+    end
+    select_dates = list_dates .∉ Ref(drop_dates)       # which forecast origins to keep
+
+    if iszero(select_dates)
+        error("No forecasts left to evaluate. You supplied a dates vector that lead to the dropping of all possible forecast origins.")
+    end
+
+    if any(select_dates.==0)
+        println("Dropping ", list_dates[select_dates.==0], "when evaluating.")
+    end
+
+    # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
+    apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat[:,select_dates]; dims=2),dims=2); # average predictive likelihood 
+
+    msfe_vec = dropdims(BEAVARs.nanfunc(mean, sfe_mat[:,select_dates]; dims=2),dims=2)
+    mafe_vec = dropdims(BEAVARs.nanfunc(mean, ae_mat[:,select_dates]; dims=2),dims=2)
+    rmsfe_vec = sqrt.(msfe_vec);
+    rmafe_vec = sqrt.(mafe_vec);
+
+    n_fcast, n_eval = size(fe_mat);
+    h_values = ["T+$i" for i in 1:n_fcast]
+    fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
+    pretty_table(fe_tab)
+    return fe_tab
+end
 
 #-------------------------------------
 end # END OF MODULE
