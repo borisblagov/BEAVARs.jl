@@ -276,9 +276,9 @@ function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
 end
 
 """
-        eval_vint_dict, FEvint_mean_mat, list_keys = beavars_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String, BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+    beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
 
-        Evaluate the forecasts of the models in vint_out_dict against the true values in dataLF_true_ftab.
+    prepare the forecasts for evaluation
 """
 function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
     eval_vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelEval}()
@@ -322,9 +322,9 @@ function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmode
     ae_mat_sort        = ae_mat[:,sort_ind];
     pred_lik_mat_sort   = pred_lik_mat[:,sort_ind]
 
-    eval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
+    toEval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
 
-    return eval_struct, eval_vint_dict
+    return toEval_struct, eval_vint_dict
 end
 
 """

@@ -1,6 +1,10 @@
 #-------------------------------------
 # The Den: this is where the beavar lives
 #-------------------------------------
+
+@doc raw"""
+    Main function for CPZ2023
+"""
 function beavar(::CPZ2023_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello CPZ2023")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
@@ -12,12 +16,9 @@ end
 
 
 @doc raw"""
-    CPZ2023(dataHF_tab,dataLF_tab,varOrder,varSetup,hyp_struct)
-
-    Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior and prior updating
-
-    Main function
-
+    BEAVARs.CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+    
+    Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior
 """
 function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, N, D, A <: AbstractArray{Typ, N}}
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW = varSetup
@@ -108,7 +109,7 @@ end
 
 
 @doc raw"""
-    CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)    
+    CPZ_prep_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)
 
     Prepare one large table with the full dataset  `fataHF_tab` with both low and high-frequency variables with low-freq having `NaNs`. 
     It will extend the table with n_fcst, which is the amoung of *low frequency* time periods.
@@ -259,7 +260,7 @@ end
 @doc raw"""
     M_inter_agg = CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp)
 
-    Generate an M matrix to aggregate low frequency to high frequency such that M*high_freq_tab = low_freq_tab
+    Generate an M matrix for aggregating vectors of low frequency to high frequency data such that M*high_freq_tab = low_freq_tab
 """
 function CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp)
     T_z = length(fdatesLF);

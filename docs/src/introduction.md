@@ -16,14 +16,14 @@ julia> using BEAVARs
 ## Usage overview
 The main function of the package is
 ```julia
-beavar(model_type, set_strct, hyp_strct, data_strct)
+beavar(model_type, set_struct, hyp_struct, data_struct)
 ```
 which calls the relevant models and performs the estimation. Using the package boils down to the correct specification of these arguments, for which special functions exist to help you create them. Before jumping in the details let's give a brief overview.
 
 - `model_type`: An object that allows Julia to know which model you want to use and call the relevant functions. 
-- `set_strct`:  A structure containing the general VAR setup such as number of lags, number of draws, etc.
-- `hyp_strct`:  A structure for setting the hyperparameters for the Bayesian estimation.
-- `data_strct`: A structure containing your data.
+- `set_struct`:  A structure containing the general VAR setup such as number of lags, number of draws, etc.
+- `hyp_struct`:  A structure for setting the hyperparameters for the Bayesian estimation.
+- `data_struct`: A structure containing your data.
 
 The first three objects are generated using a helper function `make_setup`. The fourth object is generated using the helper function `makeDataSetup()`. Let us showcase each of these by estimating a simple example based on the Minnesota prior.
 
@@ -73,7 +73,7 @@ We can see in the help that for the first argument `model_str` one of the permis
 
 Let's call the function `makeSetup` with our specifications.
 ```julia
-julia> model_type, set_strct, hyp_strct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=2)
+julia> model_type, set_struct, hyp_struct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=2)
 ```
 
 After pressing enter we are greeted with the following output, which is a bit hard to read but if you follow the commas you will see that we have generated three outputs: (1) `BEAVARs.Chan2020minn_type()`; (2) a structure `BEAVARs.VARSetup` with some general VAR settings; (3) a structure `hypChan2020` with a lot of hyperparameters; . We will not go into details why some of these are prefaced with `BEAVARs.` and others are not.
@@ -110,7 +110,7 @@ BEAVARs.Chan2020minn_type()
 
 We can inspect the other elements as well by typing their binding, e.g.
 ```julia
-julia> set_strct
+julia> set_struct
 BEAVARs.VARSetup
   p: Int64 2
   nsave: Int64 20
@@ -122,9 +122,9 @@ BEAVARs.VARSetup
 ```
 
 !!! note "Changes to these structures"
-    Suppose we wanted to change some of the settings. It might be logical for you to then try something like `set_strct(p=2)` but this is not the way to go. Use the function `makeSetup` again. Supose we actually wanted 3 lags, we can do:
+    Suppose we wanted to change some of the settings. It might be logical for you to then try something like `set_struct(p=2)` but this is not the way to go. Use the function `makeSetup` again. Supose we actually wanted 3 lags, we can do:
     ```julia
-    model_type, set_strct, hyp_strct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=3)
+    model_type, set_struct, hyp_struct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=3)
     ```
     Do not forget to add the settings we are **not** changing, in the above example `n_burn` and `n_save`.
 
@@ -168,7 +168,7 @@ makeDataSetup(::BEAVARs.Chan2020minn_type,::TimeSeries.TimeArray)
 It takes two mandatory inputs and one optional one. We will only supply the first two: `model_type` variable and `data`.
 
 ```julia
-julia> data_strct = makeDataSetup(model_type,data)
+julia> data_struct = makeDataSetup(model_type,data)
 BEAVARs.dataBVAR_TA
   data_tab: TimeArray{Float64, 2, DateTime, Matrix{Float64}}
   var_list: Array{Symbol}((3,))
@@ -179,13 +179,13 @@ We did not specify any variable names, thus `var_list` will simply take the name
 
 Now we are ready to estimate the model. The generic function is 
 ```julia
-julia> out_strct = beavar(model_type, set_strct, hyp_strct, data_strct);
+julia> out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
 ```
 
-**That's it!** `out_strct` contains the relevant output from the model and is used as input for further analyses such as forecasts or structural analysis (impulse response functions).
+**That's it!** `out_struct` contains the relevant output from the model and is used as input for further analyses such as forecasts or structural analysis (impulse response functions).
 
 ```julia
-julia> out_strct
+julia> out_struct
 BEAVARs.VAROutput_Chan2020minn
   store_β: Array{Float64}((21, 20)) [0.32320381087683125 0.5761295647868285 … 0.4607520139245541 0.42639561226264844; -0.06868758161342711 -0.01088669918413799 … -0.07791244344526811 -0.2605076421733443; … ; -0.06689834851525589 -0.005589195016996569 … 0.002709639906057543 -0.052079260901279636; -0.05091553975975063 -0.17067934162978135 … 0.0682082052074954 0.12190155764719483]
   store_Σ: Array{Float64}((9, 20)) [0.08287691219041017 0.08287691219041017 … 0.08287691219041017 0.08287691219041017; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.08246390271378752 0.08246390271378752 … 0.08246390271378752 0.08246390271378752]
@@ -195,9 +195,9 @@ BEAVARs.VAROutput_Chan2020minn
 !!! note "Julia is a compiled language"
     Julia compiles the function the first time it is run and every run afterwards only executes the compiled code. Thus the first run is very slow. For this package it makes sense to always run the function the first time with very few draws and burn-in. Then you can run it with the desired number.
     ```julia
-    julia> model_type, set_strct, hyp_strct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=2)
-    julia> out_strct = beavar(model_type, set_strct, hyp_strct, data_strct);
-    julia> model_type, set_strct, hyp_strct = makeSetup("Chan2020minn";n_burn=2000,n_save=5000,p=2)
+    julia> model_type, set_struct, hyp_struct = makeSetup("Chan2020minn";n_burn=20,n_save=50,p=2)
+    julia> out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
+    julia> model_type, set_struct, hyp_struct = makeSetup("Chan2020minn";n_burn=2000,n_save=5000,p=2)
     ```
 
-The structure `out_strct` contains the output of the model which can be used for further analysis such as forecasting or structural analysis using impulse response functions.
+The structure `out_struct` contains the output of the model which can be used for further analysis such as forecasting or structural analysis using impulse response functions.

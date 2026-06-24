@@ -8,7 +8,8 @@ makedocs(
         "Introduction" => "introduction.md",
         "Estimation" => [
             "Chan2020minn" => "Chan2020minn.md",
-            "Chan2020iniw" => "Chan2020iniw.md"
+            "Chan2020iniw" => "Chan2020iniw.md",
+            "CPZ2023" => "CPZ2023.md"
         ],
         "Forecasting" => "forecasting.md",
         "Structural analysis" => "irfs.md",
@@ -16,7 +17,8 @@ makedocs(
             "Constructors" => "Constructors.md",
             "Initialization" => "init_functions.md",
             "Data transformation" => "dataPrep.md"
-        ]
+        ],
+        "References" => "references.md"
     ]
 )
 deploydocs(
