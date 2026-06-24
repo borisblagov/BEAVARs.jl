@@ -324,7 +324,7 @@ function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmode
 
     eval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
 
-    return eval_struct
+    return eval_struct, eval_vint_dict
 end
 
 """
@@ -337,9 +337,13 @@ function eval_forecasts(eval_struct; drop_dates = Date[])
     @unpack list_dates, list_keys, fe_mat, sfe_mat, ae_mat, pred_lik_mat =  eval_struct
 
     if typeof(drop_dates)<:Date                             # check if the date supplied is a vector of dates (multiple) or only one, then convert it to Vector
-        drop_dates = [drop_dates]
+        drop_dates_vec = [drop_dates]
+    elseif typeof(drop_dates)<:StepRange
+        drop_dates_vec = collect(drop_dates)
+    elseif typeof(drop_dates)<:Vector{Date}
+        drop_dates_vec = drop_dates;
     end
-    select_dates = list_dates .∉ Ref(drop_dates)       # which forecast origins to keep
+    select_dates = list_dates .∉ Ref(drop_dates_vec)       # which forecast origins to keep
 
     if iszero(select_dates)
         error("No forecasts left to evaluate. You supplied a dates vector that lead to the dropping of all possible forecast origins.")
@@ -355,11 +359,10 @@ function eval_forecasts(eval_struct; drop_dates = Date[])
     msfe_vec = dropdims(BEAVARs.nanfunc(mean, sfe_mat[:,select_dates]; dims=2),dims=2)
     mafe_vec = dropdims(BEAVARs.nanfunc(mean, ae_mat[:,select_dates]; dims=2),dims=2)
     rmsfe_vec = sqrt.(msfe_vec);
-    rmafe_vec = sqrt.(mafe_vec);
 
     n_fcast, n_eval = size(fe_mat);
     h_values = ["T+$i" for i in 1:n_fcast]
-    fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
+    fe_tab = (h = h_values, RMSFE = rmsfe_vec, MAFE = mafe_vec, APL = apl_vec)
     pretty_table(fe_tab)
     return fe_tab
 end
