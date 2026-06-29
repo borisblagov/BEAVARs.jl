@@ -1,6 +1,6 @@
 name = "BEAVARs"
 uuid = "93a03eec-7b33-4fd3-aded-846a82f4850b"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Boris Blagov <46528899+borisblagov@users.noreply.github.com> and contributors"]
 
 [workspace]
