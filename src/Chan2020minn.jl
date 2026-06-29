@@ -13,6 +13,7 @@
     store_Σ::Array{T,N}      # 
     YY::Array{T,N}            #
     fdatesLF:: Vector{DateTime}
+    store_YY::Array{T,3}            #
 end
 
 function makeHypSetup(::Chan2020minn_type)
@@ -97,14 +98,18 @@ end
 function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     println("Hello Minn")
     @unpack data_tab, data_mat, var_list = data_struct;
+    @unpack n_fcst, n_save = set_struct;
     freqL_date = BEAVARs.get_data_freq(data_tab);
     datesLF = timestamp(data_tab);
-    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(n_fcst));
     fdatesLF = [datesLF;datesLF_fcast];
     YY = data_mat;
+    T,n = size(YY);
+    store_YY = fill(NaN,(T+n_fcst,n,n_save))
     store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
-    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
+    out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF,store_YY);
     fcast_struct = forecast(out_struct, set_struct, data_struct);
+    out_struct.store_YY[:,:,:] =  @view fcast_struct.Yfor3d[:,:,:];
     return out_struct, fcast_struct 
 end
 
@@ -229,12 +234,12 @@ end # end function fcastChan2020minn()
 
 
 
-function eval_forecast(out_struct::VAROutput_Chan2020minn,set_struct::BVARmodelSetup,fcast_struct::BVARforecastOutput,data_struct::BVARmodelDataSetup,dataLF_true_ftab::TimeArray{T,N,D,A}) where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
-    @unpack Yfor3d = fcast_struct;  
+function eval_forecast(out_struct::VAROutput_Chan2020minn,data_struct::BVARmodelDataSetup,set_struct::BVARmodelSetup,dataLF_true_ftab::TimeArray{T,N,D,A}) where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
+    @unpack store_YY = out_struct;  
     @unpack data_tab, var_list = data_struct
     @unpack n_fcst, p, n_save, prior_RW = set_struct
 
-    store_YY_LF = Yfor3d
+    store_YY_LF = store_YY;
     dataLF_tab = data_tab;
     # check if we are working in levels to transform the true data to growth rates for evaluation
     if prior_RW == 1
