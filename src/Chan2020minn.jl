@@ -39,6 +39,11 @@ function makeDataSetup(::Chan2020minn_type,data_tab::TimeArray; var_list =  coln
 end
 
 
+function makeDataSetup(::Chan2020minn_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
+    data_tab = merge(dataLF_tab, dataHF_tab)
+    return data_BVAR(data_tab,values(data_tab), var_list)
+end
+
 
 @doc raw"""
     BEAVARs.Chan2020minn(YY,VARSetup,hypSetup)
