@@ -104,7 +104,8 @@ function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     YY = data_mat;
     store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF);
-    return out_struct
+    fcast_struct = forecast(out_struct, set_struct, data_struct);
+    return out_struct, fcast_struct 
 end
 
 
@@ -134,28 +135,28 @@ The function generates forecasts from the Chan2020minn model output.
 function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     @unpack store_β, store_Σ, YY = VAROutput
     @unpack n_fcst, p, n_save = VARSetup
-    n = size(YY,2);
+    T, n = size(YY);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
-    Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
+    Yfor_3dmat    = fill(NaN,(T+n_fcst,n,n_save))
+    Yfor_3dmat[1:T,:,:] .= @views YY[1:T,:];
     
     for i_draw = 1:n_save
-        Yfor = @views Yfor3D[:,:,i_draw];
+        Yfor = @views Yfor_3dmat[T-p+1:end,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);
                 
         for i_for = 1:n_fcst
             tclass = @views vec(reverse(Yfor[1+i_for-1:p+i_for-1,:],dims=1)')
             tclass = [1.0;tclass];
-            Yfor[p+i_for,:]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
+            Yfor_3dmat[T+i_for,:,i_draw]=tclass'*A_draw  .+ (cholesky(Σ_draw).U*randn(n,1))';    
         end
     end
 
-    Yfor3d = Yfor3D[p+1:end,:,:];
+    # Yfor3d = Yfor3D[p+1:end,:,:];
 
-    YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2 = BEAVARs.get_imp_percentiles(Yfor3d); # TODO add the to the output
+    YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2 = BEAVARs.get_imp_percentiles(Yfor_3dmat); # TODO add the to the output
  
-    fcast_struct = BEAVARs.VARForecast(Yfor3d,data_struct.data_tab,data_struct.var_list,n_fcst)
+    fcast_struct = BEAVARs.VARForecast(Yfor_3dmat,data_struct.data_tab,data_struct.var_list,n_fcst)
     return fcast_struct
 
 end # end function fcastChan2020minn()
@@ -174,8 +175,8 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
     @unpack n_fcst, p, n_save = VARSetup
     n = size(YY,2);
 
-    Yfor3D    = fill(NaN,(p+n_fcst,n,n_save))
-    Yfor3D[1:p,:,:] .= @views YY[end-p+1:end,:];
+    Yfor_3dmat    = fill(NaN,(p+n_fcst,n,n_save))
+    Yfor_3dmat[1:p,:,:] .= @views YY[end-p+1:end,:];
     
     data_truef_mat = values(data_true_ftab)
     data_true_flags_vec = timestamp(data_true_ftab) .∈  Ref(fdatesLF[end-n_fcst+1:end]) # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of tre data but have only done forecast for 2)
@@ -188,8 +189,8 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
 
 
     for i_draw = 1:n_save
-        Yfor = @views Yfor3D[:,:,i_draw];
-        YforExp = @views Yfor3D[p+1:end,:,i_draw];
+        Yfor = @views Yfor_3dmat[:,:,i_draw];
+        YforExp = @views Yfor_3dmat[p+1:end,:,i_draw];
         A_draw = @views reshape(store_β[:,i_draw],n*p+1,n);
         Σ_draw = @views reshape(store_Σ[:,i_draw],n,n);
         sqSig = sqrt.(Σ_draw);
@@ -216,7 +217,7 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
     max_dens = BEAVARs.nanfunc(maximum,joint_logdens_3dmat,dims=3);
     lpl_joint_mat = dropdims(log.(BEAVARs.nanfunc(mean,exp.(joint_logdens_3dmat.-max_dens),dims=3))+max_dens,dims=3);
 
-    Yfor3d = Yfor3D[p+1:end,:,:];
+    Yfor3d = Yfor_3dmat[p+1:end,:,:];
     fcast_ϵ_mat = dropdims(mean(-(Yfor3d[forecast_overlap_vec,:,:] .-  data_truef_mat[data_true_flags_vec,:]),dims=3),dims=3);    # forecast errors
 
     YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2 = BEAVARs.get_imp_percentiles(Yfor3d); # TODO add the to the output
@@ -225,3 +226,71 @@ function forecast(VAROutput::VAROutput_Chan2020minn,VARSetup::BVARmodelSetup,dat
     return fcast_struct, fcast_ϵ_mat, lpl_mat, lpl_joint_mat
 
 end # end function fcastChan2020minn()
+
+
+
+function eval_forecast(out_struct::VAROutput_Chan2020minn,set_struct::BVARmodelSetup,fcast_struct::BVARforecastOutput,data_struct::BVARmodelDataSetup,dataLF_true_ftab::TimeArray{T,N,D,A}) where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
+    @unpack Yfor3d = fcast_struct;  
+    @unpack data_tab, var_list = data_struct
+    @unpack n_fcst, p, n_save, prior_RW = set_struct
+
+    store_YY_LF = Yfor3d
+    dataLF_tab = data_tab;
+    # check if we are working in levels to transform the true data to growth rates for evaluation
+    if prior_RW == 1
+        dataLF_tab = percentchange(dataLF_tab);
+        dataLF_true_ftab = percentchange(dataLF_true_ftab);
+        fdatesLF = out_struct.fdatesLF[2:end];              # we lose the first date when we take growth rates, so we need to adjust the forecast dates accordingly
+        store_YY_LF = out_struct.store_YY_LF[2:end,:,:]./out_struct.store_YY_LF[1:end-1,:,:].-1;
+    else
+        fdatesLF = out_struct.fdatesLF;
+    end
+
+    var_list_true = colnames(dataLF_true_ftab);             # list of symbols of variables that will be evaluated
+    data_eval_tab = dataLF_tab[:,var_list_true];            # sorting a subset of all low-frequency variables so that they will be evaluated in the correct order
+
+    no_nan_flag_mat = .!isnan.(values(data_eval_tab));      # whether in the low-frequency data we have missing values, in the order of the variables in the true table (i.e. unbalanced panel for the low-freq variable)
+    # if no_nan_flag_mat is the same across all variables, we can do the evaluation for all variables at the same time, otherwise we need to do it separately for each variable
+    data_truef_mat = values(dataLF_true_ftab);
+    datesLF_true = timestamp(dataLF_true_ftab)
+    n_fvar = size(dataLF_true_ftab,2)                   # evaluating forecasts only for the variables for which we have true data
+    # logdensKDE_3dmat = fill(NaN,(n_fcst,n_fvar));   # houses the log-density of each evaluated variable and forecast horizon
+    datesLF = timestamp(data_eval_tab);
+
+    pred_lik_mat = fill(NaN,(n_fcst,n_fvar));           # houses the predictive likelihood for each evaluated variable and forecast horizon
+    fcast_errors_mAd_mat = fill(NaN,(n_fcst,n_fvar));   # houses the forecast error for each evaluated variable and forecast horizon, mean over all draws
+
+
+    
+    locs = [findfirst(==(s), var_list) for s in var_list_true]
+    obs_datesLF = datesLF[no_nan_flag_mat[:,1]];                    # dates for which we have obs, everthing else is forecast, we may simply take the first column as we checked they are all equal
+    fcast_flags = fdatesLF .∉  Ref(obs_datesLF);                    # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
+    fcast_datesLF = fdatesLF[fcast_flags];                          # corresponding dates 
+
+    data_true_flags_vec = datesLF_true .∈  Ref(fcast_datesLF)                   # flags saying which rows of the true data correspond to our forecasts (e.g. we might have 12 periods of true data but have only done forecast for 2)
+    fcastDatesOverlap = fcast_datesLF[fcast_datesLF .∈  Ref(datesLF_true)]      # which forecasts overlap with our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+    fcastDatesOverlap_BitVec = fdatesLF .∈ Ref(fcastDatesOverlap)               # flags saying which rows of the forecast correspond to our true data (e.g. we might have done 8 forecasts but have only 4 periods of true data)
+
+    # this is the true data for our T+1 to T+n_fcst forecasts
+    data_true_VecView = data_truef_mat[data_true_flags_vec,locs]    # select only the variables that we want to evaluate and only the relevant time periods
+
+    # these are the relevant forecasts
+    fcast_YY =  store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
+    fcast_YY_mat = dropdims(mean(fcast_YY,dims=3),dims=3);
+    fcast_errors_mat = data_true_VecView .- fcast_YY
+
+    fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
+
+    # predictive likelihood as in Carriero et al 2013 JAE
+    pred_lik_mat[1:size(fcast_errors_mat,1),:] = BEAVARs.pred_lik_CCM(fcast_YY,data_true_VecView)
+    
+    
+       
+    
+    # TODO this works only for the balanced case (the first one above)
+    data_true_dates = datesLF_true[data_true_flags_vec];
+    
+    eval_vint_Chan2020minn_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates)
+    return eval_vint_Chan2020minn_struct
+    # return pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates
+end

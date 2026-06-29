@@ -8,4 +8,9 @@ data_struct = makeDataSetup(model_type,data)
 out_struct = beavar(model_type, set_struct, hyp_struct, data_struct)
 
 fcast_struct = BEAVARs.forecast(out_struct, set_struct, data_struct)
-BEAVARs.forecast_plot(fcast_struct)
+
+
+data_true = TimeArray(DateTime(2027,7,1):Quarter(1):DateTime(2029,4,1),rand(8,3))
+fcast_struct = BEAVARs.forecast(out_struct, set_struct, data_struct,data_true)
+
+# BEAVARs.forecast_plot(fcast_struct)

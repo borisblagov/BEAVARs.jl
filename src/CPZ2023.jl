@@ -862,9 +862,9 @@ end
 struct eval_vint_CPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
     pred_lik_mat::Array{T,N}  
     fcast_errors_mAd_mat::Array{T,N}
-    fcastDatesOverlap::Array{Date,1}
+    fcastDatesOverlap::Union{Array{Date, 1}, Array{DateTime, 1}}
     data_true_VecView::Array{T,N}
-    data_true_dates::Array{Date,1}
+    data_true_dates::Union{Array{Date, 1}, Array{DateTime, 1}}
 end
 
 

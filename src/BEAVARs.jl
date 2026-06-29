@@ -125,7 +125,7 @@ end
 
 # types for forecast output export
 @with_kw struct VARForecast{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}  <: BVARforecastOutput
-    Yfor3d::Array{T,3}            # 3D array with the forecasts. Dimensions are (p+n_fcst) x n x n_save
+    Yfor3d::Array{T,3}            # 3D array with the data and forecasts. Dimensions are (T+n_fcst) x n x n_save
     data_tab::TimeArray{T,N,D,A}  # dataset in a TimeArray format   
     var_list::Array{Symbol,1}  # variable names for the forecasts
     n_fcst::Int                # number of forecast periods
@@ -301,18 +301,6 @@ function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmode
 
     sfe_mat = fe_mat.^2;     # squared forecast error matrix
     ae_mat  = abs.(fe_mat);  # absolute forecast error matrix
-
-    # # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
-    # apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat; dims=2),dims=2); # average predictive likelihood 
-
-    # msfe_vec = dropdims(BEAVARs.nanfunc(sum, sfe_mat; dims=2),dims=2)
-    # mafe_vec = dropdims(BEAVARs.nanfunc(sum, ae_mat; dims=2),dims=2)
-    # rmsfe_vec = sqrt.(msfe_vec);
-    # rmafe_vec = sqrt.(mafe_vec);
-
-    # h_values = ["T+$i" for i in 1:n_fcast]
-    # fe_tab = (h = h_values, RMSFE = rmsfe_vec, RMAFE = rmafe_vec, APL = apl_vec)
-    # pretty_table(fe_tab)
 
     sort_ind            = sortperm(list_dates);
     list_dates_sort     = list_dates[sort_ind];
