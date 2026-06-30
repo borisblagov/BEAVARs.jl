@@ -115,7 +115,7 @@ function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF,store_YY);
     fcast_struct = forecast(out_struct, set_struct, data_struct);
     out_struct.store_YY[:,:,:] =  @view fcast_struct.Yfor3d[:,:,:];
-    return out_struct, fcast_struct 
+    return out_struct 
 end
 
 

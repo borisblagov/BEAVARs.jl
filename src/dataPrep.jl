@@ -125,7 +125,7 @@ function xlsx2ta(data_mat)
 end
 
 
-function readSpec(modelstr,data_path)
+function readSpecMF(modelstr,data_path)
     xf = XLSX.readxlsx(data_path);
     sh_names = XLSX.sheetnames(xf)
 
@@ -170,6 +170,43 @@ function readSpec(modelstr,data_path)
     lf_ta = BEAVARs.TAtrans(dataLF_TA,varList_LF,trans_dictA)
     
     return hf_ta, lf_ta, varListF
+
+end
+
+
+function readSpecOF(modelstr,data_path)
+    xf = XLSX.readxlsx(data_path);
+    sh_names = XLSX.sheetnames(xf)
+
+    sh_ref = xf["setup"];
+    sh_mat = sh_ref[:]
+
+    # Reads the setup sheet
+    model_ind = findall(sh_mat[1,:].==modelstr)[1]
+    vb_ind = findall(sh_mat[:,1].=="lastRow")[1] + 1;       # where the variables start
+    varListA_str = sh_mat[vb_ind:end,1];                    # strings of variables
+    varListA_sym = Symbol.(varListA_str[:]);                # symbols of variables
+
+    vm_bit = .!iszero.(sh_mat[vb_ind:end,model_ind]);       # boolean list of ALL variables
+    vm_trans = sh_mat[vb_ind:end,model_ind];                # list of variables with transformations for ALL vars
+
+    varListF = varListA_sym[vm_bit]
+    trans_dictA = Dict(varListA_sym .=> vm_trans);          # transformation dictionary vector for ALL vars. 
+
+    # Reads the low-frequency
+    datasheetLF_str = "datasheet" * string(sh_mat[sh_mat[:,1].=="datasheet",model_ind][1]) * "_LF";    # the low-frequency datasheet
+    data_mat = xf[datasheetLF_str][:];
+    dataf_LF_TA = BEAVARs.xlsx2ta(data_mat)
+    varList_LF = intersect(varListF,colnames(dataf_LF_TA));      # looks for which variables are required and which are found
+    dataLF_TA = dataf_LF_TA[varList_LF];                         # selects the variables found in this TA
+
+    # transHF_vec = Vector{Int}();                                # vector of transformations for the found high-freq. vars
+    # push!(transHF_vec,(trans_dictA[i] for i in varList_HF)...);  # fill it
+    # transHF_vec = getindex.(Ref(trans_dictA),varList_HF);       # vector of transformations for the vars
+
+    lf_ta = BEAVARs.TAtrans(dataLF_TA,varList_LF,trans_dictA)
+    
+    return lf_ta, varListF
 
 end
 
@@ -290,8 +327,13 @@ function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String
     n_list = length(model_cols_list);
     vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
     for ii=1:n_list 
-        dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpec(model_cols_list[ii],file_path);
-        data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab)
+        if typeof(model_type) <: BEAVARs.BVARmodelMFType
+            dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpecMF(model_cols_list[ii],file_path);
+            data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab,var_list = varOrder)
+        elseif typeof(model_type) <: BEAVARs.BVARmodelOFType
+            data_tab, varOrder = BEAVARs.readSpecOF(model_cols_list[ii],file_path);
+            data_struct = makeDataSetup(model_type,data_tab,var_list = varOrder)
+        end
         vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
     end
     return vint_dict

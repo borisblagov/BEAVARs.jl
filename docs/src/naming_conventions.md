@@ -7,6 +7,7 @@ In most of my codes I try to use similar naming scheme for various objects. Whil
 `_3dmat`: three dimensional version of the two-dimensional object _mat.
 `_save`:  also often three dimensional matrix, used for saving Bayesian draws
 `_ta`: a `TimeArray`
+`_tab`: a `Table`, often actually also `TimeArray`
 
 ## Letters
 `T´: time periods

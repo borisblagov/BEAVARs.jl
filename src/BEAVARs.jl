@@ -34,6 +34,8 @@ export beavar, beavars, beavars_weave, makeOutput, makeSetup, makeHypSetup, make
 
 # Types for multiple dispatch across models
 abstract type BVARmodelType end         # types for models
+abstract type BVARmodelMFType <: BVARmodelType end # a type cathing all mixed frequency models
+abstract type BVARmodelOFType <: BVARmodelType end # a type cathing all standard one frequency models
 abstract type BVARmodelSetup end        # type for VAR setup parameters
 abstract type BVARmodelHypSetup end     # types for hyperparameters
 abstract type BVARmodelDataSetup end    # types for storing the data unputs to the models
@@ -44,14 +46,13 @@ abstract type BVARforecastOutput end    # type for forecast output storage
 
 
 # Structures for multiple dispatch across models
-struct Chan2020minn_type <: BVARmodelType end
-struct Chan2020iniw_type <: BVARmodelType end
-struct Chan2020iniw_type2 <: BVARmodelType end
-struct Chan2020csv_type <: BVARmodelType end
-# struct Chan2020csv_type2 <: BVARmodelType end
-struct BGR2010_type <: BVARmodelType end
-struct CPZ2023_type <: BVARmodelType end
-struct Blagov2025_type <: BVARmodelType end
+struct Chan2020minn_type <: BVARmodelOFType end
+struct Chan2020iniw_type <: BVARmodelOFType end
+struct Chan2020iniw_type2 <: BVARmodelOFType end
+struct Chan2020csv_type <: BVARmodelOFType end
+struct BGR2010_type <: BVARmodelOFType end
+struct CPZ2023_type <: BVARmodelMFType end
+struct Blagov2025_type <: BVARmodelMFType end
 
 # Default structure for hyperparameters
 struct hypDefault_struct <: BVARmodelHypSetup end    # empty structure for initialising the hyperparameters
