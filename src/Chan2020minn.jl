@@ -81,7 +81,7 @@ function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodel
     mul!(prior_,XtΣ_inv_den, vec(Y'),1.0,1.0);      # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
     # println(prior_);
     cholK_β = cholesky(Hermitian(K_β));             # Cholesky factor
-    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.U',prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
     
 
     ndraws = n_save+n_burn;

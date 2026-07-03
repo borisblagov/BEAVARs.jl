@@ -218,7 +218,7 @@ function Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,�
         mul!(prior_mean,XtΣ_inv_den, vec(Y'),1.0,1.0);  # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
         cholK_β = cholesky!(Hermitian(K_β));             # C is lower triangular, C' is upper triangular
         # println(@allocated cholK_β = cholesky(Hermitian(K_β)))
-        beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_mean));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+        beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.U',prior_mean));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
         beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
         return beta
 end

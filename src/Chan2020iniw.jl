@@ -25,18 +25,18 @@ end
 
 
 """
-    Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
+    Chan2020iniw(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
 
     Implements BVAR with Independent Normal Inverse Wishart (iniw) prior following Chan (2020)
 
 """
-function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
+function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     @unpack p,n_burn,n_save, prior_RW = VARSetup
     n_draws  = n_save+n_burn;
 
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβminn_inv, Vβminn_inv_elview, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
-    (idx_kappa1,idx_kappa2, Vβminn, βMinn) = prior_Minn(n,p,sigmaP,hypSetup,prior_RW)
+    (idx_kappa1,idx_kappa2, Vβminn, βMinn) = prior_Minn(n,p,sigmaP,hyp_struct,prior_RW)
 
     Vβminn_inv_elview[:] = 1.0./Vβminn;             # update the diagonal of Vβminn_inv
     Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
@@ -46,7 +46,7 @@ function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup)
     store_Σt = zeros(n,n,n_save);
     for ii = 1:n_draws 
         beta = BEAVARs.Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,βMinn,K_β,Y,n,k);
-        Σt, Σt_inv = Chan2020_drawΣt(Y,Xsur_den,beta,n,T,S_0,hypSetup.nu0);
+        Σt, Σt_inv = Chan2020_drawΣt(Y,Xsur_den,beta,n,T,S_0,hyp_struct.nu0);
 
         Σ_invsp.nzval[:] = Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )
 
