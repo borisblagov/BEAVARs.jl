@@ -33,7 +33,7 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
     
     B_draw, structB_draw, Σt_inv, b0 = BEAVARs.initParamMatrices(n,p,const_loc) 
 
-    YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_invsp, Σt_LI, Σp_invsp, Σpt_ind, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym = BEAVARs.CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p);
+    YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_invsp, Σt_LI, Σp_invsp, Σpt_ind, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym,Σt_ns_CI, Σpt_ind_CI = BEAVARs.CPZ_initMatrices_v2(YY,structB_draw,b0,Σt_inv,p);
     
     M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
 
@@ -43,7 +43,7 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
     M_inter_agg = BEAVARs.CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
     
     # YY has missing values so we need to draw them once to be able to initialize matrices and prior values
-    YYt = BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
+    YYt = BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws,Σt_ns_CI);
     
     # we will be updating the priors for variables with many missing observations (>25%)
     updP_vec = sum(Sm_bit,dims=2).>size(Sm_bit,2)*0.25;
@@ -70,11 +70,11 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
     draw_tmp = zeros(nm)
     for ii in 1:ndraws
         # draw of the missing values
-        BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws);
+        BEAVARs.CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws,Σt_ns_CI);
         # BEAVARs.CPZ_draw_wz_lessAlloc!(YYt,longyo,Y0,cB,B_draw,structB_draw,strctBdraw_LI,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,KymBar,H_B_CI,nmdraws,μ_yBar,mdraws,draw_tmp)
         
         # draw of the parameters
-        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hyp_struct,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,Vβ_inv,βMinn,K_β,cholK_β,β_draw,S_0);
+        beta,b0,B_draw,Σt_inv,structB_draw,Σt = BEAVARs.CPZ_iniw!(YY,p,hyp_struct,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,Vβ_inv,βMinn,K_β,cholK_β,β_draw,S_0, Σpt_ind_CI);
 
         if ii>n_burn
             store_β[:,ii-n_burn]  = beta;
@@ -403,6 +403,57 @@ function CPZ_initMatrices(YY,structB_draw,b0,Σt_inv,p)
 end
 
 @doc raw"""
+    
+"""
+function CPZ_initMatrices_v2(YY,structB_draw,b0,Σt_inv,p)
+    (Tf,n) = size(YY); # full time span (with initial conditions)
+    k = n*(p+1); kn = k*n
+    Tfn = n*Tf;
+    
+    YYt = (YY');
+    vYYt = vec(YYt);
+        
+    Sm_bit = isnan.(YYt)
+    So_bit = .!isnan.(YYt)
+    longyo = vYYt[vec(So_bit)];
+
+    Y0 = @views YY[1:p,:]
+    if any(isnan.(Y0))
+        Y0[isnan.(Y0)]=zeros(size(Y0[isnan.(Y0)],1)); # for the first pass remove NaNs for zeroes
+        # print("NaNs found in Y0, replaced with zeros");
+    end
+    
+    indC_nan_wide = findall(Sm_bit) #  Cartesian indices of missing values
+    # indC_non_wide = findall(!isnan,YYt)  # Cartesian indices of not missing values
+    indC_non_wide = findall(So_bit)  # Cartesian indices of not missing values
+    
+    # convert between linear and cartesian indices
+    indL_all = LinearIndices(YYt);
+    indL_nan_wide = indL_all[indC_nan_wide] # are the linear indices of NaN values
+    indL_non_wide = indL_all[indC_non_wide] # are the linear indices of non NaN values
+       
+    
+    nm = sum(Sm_bit);       # the number of missing values
+    S_full = I(Tf*n);
+    Sm = S_full[:,indL_nan_wide]; # Sm, selection matrix selecting the missing values
+    So = S_full[:,indL_non_wide]; # So, selection matrix selecting hte observed values
+    Smsp = Sm;            # sparse Sm
+    Sosp = So;            # sparse So
+    
+    # Initialize matrices
+    H_B, H_B_CI, strctBdraw_LI = BEAVARs.makeBlkDiag_ns(Tfn,n,p, -structB_draw);
+    Σ_inv, Σt_ns_CI, Σt_ns_LI = BEAVARs.makeBlkDiag_ns(Tfn,n,0,Σt_inv);   # make a non-sparse matrix if needed                         # this is ( I(Tf*n) ⊗ Σ-1 )
+    Σp_inv, Σpt_ind_CI, Σpt_ind_ns_LI = BEAVARs.makeBlkDiag_ns(Tfn-n*p,n,0,Σt_inv);                # this is ( I(T*n) ⊗ Σ-1 ), the difference is that this includes the 0,-1,...,-p lags
+    cB_b0_LI = repeat(1:n,div(Tfn-n*p-n+1+n,n));  # this repeats [1:n] so that we can update cB[indicesAfter Y_0,Y_{-1}, ..., Ymp] = b0[cB_b0_LI]
+    Xb = sparse(Matrix(1.0I, Tfn, Tfn))
+    cB = repeat(b0,Tf);
+    
+    Gm = H_B*Smsp; Go = H_B*Sosp; GΣ = Gm'*Σ_inv; Kym = GΣ*Gm; # we can initialize all these and then mutate with mul!()
+    
+    return YYt, Y0, longyo, nm, H_B, H_B_CI, strctBdraw_LI, Σ_inv, Σt_ns_LI, Σp_inv, Σpt_ind_ns_LI, Xb, cB, cB_b0_LI, Smsp, Sosp, Sm_bit, Gm, Go, GΣ, Kym,Σt_ns_CI, Σpt_ind_CI;
+end
+
+@doc raw"""
 
 """
 function CPZ_draw!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt_inv,Σt_LI,Xb,cB_b0_LI,H_Bsp,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm)
@@ -432,26 +483,27 @@ end
 @doc raw"""
     Draw with restrictions
 """
-function CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_invsp,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws)
+function CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_inv,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws,Σt_ns_CI)
     # updating cB
     BEAVARs.CPZ_update_cB!(cB,B_draw[:,2:end],B_draw[:,1],Y0,cB_b0_LI,p,n)
 
     # updating H_B
     H_B[H_B_CI] = -structB_draw[sBd_ind];
     # updating Σ_invFsp
-    Σ_invsp.nzval[:] = Σt_inv[Σt_LI];
+    #  Σ_invsp.nzval[:] = Σt_inv[Σt_LI];
+     Σ_inv[Σt_ns_CI] = Σt_inv[Σt_LI];
 
     mul!(Gm,H_B,Smsp);
     mul!(Go,H_B,Sosp);
-    mul!(GΣ,Gm',Σ_invsp);
+    mul!(GΣ,Gm',Σ_inv);
     mul!(Kym,GΣ,Gm);
     CL = cholesky(Hermitian(Kym))
     long_pr = (cB-Go*longyo);
-    μ_y = CL.U\(CL.L\(GΣ*long_pr));
+    μ_y = CL.U\(CL.U'\(GΣ*long_pr));
 
     KymBar = MOiM + Kym;
     CLBar = cholesky(Hermitian(KymBar))
-    μ_yBar = CLBar.U\(CLBar.L\(MOiz + Kym*μ_y))
+    μ_yBar = CLBar.U\(CLBar.U'\(MOiz + Kym*μ_y))
     
     mdraws = zeros(nm,nmdraws)
     for i_draw in 1:nmdraws
@@ -480,15 +532,15 @@ function CPZ_draw_wz_lessAlloc!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt
     mul!(Kym,GΣ,Gm);
     CL = cholesky(sparse(Hermitian(Kym)))
     long_pr = (cB-Go*longyo);
-    μ_y = CL.U\(CL.L\(GΣ*long_pr));
+    μ_y = CL.U\(CL.U'\(GΣ*long_pr));
 
     KymBar[:,:] = MOiM + Kym;
     CLBar = cholesky(Hermitian(KymBar))
-    # we want to calculate  μ_yBar = CLBar.U\(CLBar.L\(MOiz + Kym*μ_y))
+    # we want to calculate  μ_yBar = CLBar.U\(CLBar.U'\(MOiz + Kym*μ_y))
     mul!(μ_yBar,Kym,μ_y)                                        # do the inner most first, overwriting μ_y to save memory
     μ_yBar[:] = MOiz + μ_yBar                                   # now add MOiz, still overwriting μ_yBar
-    ldiv!(CLBar.U,ldiv!(CLBar.L,μ_yBar))
-    # μ_yBar[:] = CLBar.U\(CLBar.L\(MOiz + Kym*μ_y))
+    ldiv!(CLBar.U,ldiv!(CLBar.U',μ_yBar))
+    # μ_yBar[:] = CLBar.U\(CLBar.U'\(MOiz + Kym*μ_y))
 
     for i_draw in 1:nmdraws
         mdraws[:,i_draw] .= μ_yBar .+  ldiv!(CLBar.U,Random.randn!(draw_tmp))
@@ -539,9 +591,10 @@ end
         Σt,
         Σt_inv
 """
-function CPZ_iniw!(YY,p,hyp_struct,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,Vβ_inv,βMinn,K_β,cholK_β,β_draw,S_0)
+function CPZ_iniw!(YY,p,hyp_struct,n,k,b0,B_draw,Σt_inv,structB_draw,Σp_invsp,Σpt_ind,Y,X,T,Xsur_den,Xsur_CI,X_CI,XtΣ_inv_den,XtΣ_inv_X,Vβ_inv,βMinn,K_β,cholK_β,β_draw,S_0, Σpt_ind_CI)
     Y, X = mlagL!(YY,Y,X,p,n)
-    Σp_invsp.nzval[:] = Σt_inv[Σpt_ind];    
+    # Σp_invsp.nzval[:] = Σt_inv[Σpt_ind];
+    Σp_invsp[Σpt_ind_CI] = Σt_inv[Σpt_ind];     
     Xsur_den[Xsur_CI] = X[X_CI]; 
 
     β_draw[:] = BEAVARs.Chan2020_drawβ(Σp_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβ_inv,βMinn,K_β,Y,n,k);

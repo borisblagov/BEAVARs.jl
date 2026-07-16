@@ -1,6 +1,6 @@
 # Naming conventions
 
-In most of my codes I try to use similar naming scheme for various objects. While I do not follow it extremely rigorously I try to keep to those conventions more often than not (I also sometimes get annoyed when similar papers use different conventions, e.g. `N`  often denots the number of variables, while in a Global VARs people use `N` for number of units/countries and `G` for number of variables...
+In most of my codes I thought that I try to use similar naming scheme for various objects until I decided to write this down and realised how much of a mess it is. In order to try to have cleaner code I am devising this scheme here and will see if I can implement it. 
 
 ## Arrays
 `_mat`: two dimensional matrix

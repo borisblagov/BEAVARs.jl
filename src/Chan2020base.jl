@@ -123,6 +123,23 @@ function makeBlkDiag(Tfn::Int,n::Int,p::Int,blockMat)
             blkDiagMatInt_sp[ ij*n + (ii-1)*n + 1 : n + (ii-1)*n +  ij*n, (ii-1)*n + 1 : n + (ii-1)*n] = blockMatInd[ :, 1 + (ij-0)*n : n + (ij-0)*n]
         end
     end
+    
+    
+    # for ij = 0:p
+    #     for ii = 1:div(Tfn, n) - ij
+    #         row_start = ij * n + (ii - 1) * n + 1
+    #         row_end = n + (ii - 1) * n + ij * n
+    #         col_start = (ii - 1) * n + 1
+    #         col_end = n + (ii - 1) * n
+    
+    #         # Directly update the sparse matrix
+    #         for i = row_start:row_end
+    #             for j = col_start:col_end
+    #                 blkDiagMatInt_sp[i, j] = blockMatInd[i - row_start + 1, j - col_start + 1]
+    #             end
+    #         end
+    #     end
+    # end
 
     # - copy those linear indices to be used
     blockMatInd_vec = deepcopy(blkDiagMatInt_sp.nzval)
@@ -218,7 +235,7 @@ function Chan2020_drawβ(Σ_invsp,Xsur_den,XtΣ_inv_den,XtΣ_inv_X,Vβminn_inv,�
         mul!(prior_mean,XtΣ_inv_den, vec(Y'),1.0,1.0);  # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
         cholK_β = cholesky!(Hermitian(K_β));             # C is lower triangular, C' is upper triangular
         # println(@allocated cholK_β = cholesky(Hermitian(K_β)))
-        beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.U',prior_mean));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+        beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.L,prior_mean));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
         beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
         return beta
 end
