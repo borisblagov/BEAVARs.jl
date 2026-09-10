@@ -22,8 +22,8 @@ out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
 
 # Blagov2025
 model_type, set_struct, hyp_struct= makeSetup("Blagov2025",n_burn=20;n_save=50,p=2)
-dataHF_tab, dataLF_tab, varList = BEAVARs.readSpec("bg_L250911","data/Specifications_mfvar.xlsx");
-data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab,0)
+dataHF_tab, dataLF_tab, varList = BEAVARs.readSpecMF("bg_L250911","data/Specifications_mfvar.xlsx");
+data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab)
 out_struct = beavar(model_type,set_struct,hyp_struct,data_struct)
 # out_struct = beavar(model_type,set_struct,hyp_struct,data_struct);
 

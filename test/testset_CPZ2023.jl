@@ -2,7 +2,7 @@
 # TODO create a VAR Data for this
 
 model_type, set_struct, hyp_struct= makeSetup("CPZ2023",n_burn=50;n_save=10,p=2)
-dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpec("bgtest","data/Specifications_mfvar.xlsx");
+dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpecMF("bgtest","data/Specifications_mfvar.xlsx");
 
 aggMix = 0;
 data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab,aggMix)

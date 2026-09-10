@@ -18,7 +18,7 @@ end
 @doc raw"""
     BEAVARs.CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     
-    Estimate Chan, Zhu, Poon 2024 using a  Minnesota-based independent Normal-Wishart prior
+    Estimate Chan, Zhu, Poon 2023 using a  Minnesota-based independent Normal-Wishart prior
 """
 function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,A},varOrder::Array{Symbol,1},varSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, N, D, A <: AbstractArray{Typ, N}}
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW = varSetup

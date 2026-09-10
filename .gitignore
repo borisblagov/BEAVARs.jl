@@ -3,7 +3,9 @@
 /docs/build/
 /dev
 /data
+/results
 /.vscode
+/.scicodenotes
 .vscode/settings.json
 Manifest.toml
 /docs/Manifest.toml

@@ -53,6 +53,7 @@ struct Chan2020csv_type <: BVARmodelOFType end
 struct BGR2010_type <: BVARmodelOFType end
 struct CPZ2023_type <: BVARmodelMFType end
 struct Blagov2025_type <: BVARmodelMFType end
+struct Blagov2027_type <: BVARmodelMFType end
 
 # Default structure for hyperparameters
 struct hypDefault_struct <: BVARmodelHypSetup end    # empty structure for initialising the hyperparameters
@@ -71,6 +72,8 @@ function selectModel(model_str::String)
         model_type = CPZ2023_type()
     elseif model_str == "Blagov2025"
         model_type = Blagov2025_type()
+    elseif model_str == "Blagov2027"
+        model_type = Blagov2027_type()
     else
         error("Model not found, make sure the spelling is completely correct, upper and lowercase matters!\n Possible models are: \n    BGR2010 \n    Chan2020minn\n    Chan2020csv\n    Chan2020iniw\n CPZ2023\n")
     end
@@ -214,6 +217,8 @@ function selectConstLoc(model_str::String)
         const_loc = 1
     elseif model_str == "Blagov2025"
         const_loc = 1
+    elseif model_str == "Blagov2027"
+        const_loc = 1
     else
         error("Constant location (right or left of X) is not defined for this model.\n Either define it in selectConstLoc function or report the bug")
     end
@@ -233,6 +238,7 @@ include("Chan2020iniw.jl")
 include("Chan2020csv.jl")
 include("CPZ2023.jl")
 include("Blagov2025.jl")
+include("Blagov2027.jl")
 include("plot_functions.jl")
 
 
