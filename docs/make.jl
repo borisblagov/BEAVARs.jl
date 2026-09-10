@@ -9,7 +9,9 @@ makedocs(
         "Estimation" => [
             "Chan2020minn" => "Chan2020minn.md",
             "Chan2020iniw" => "Chan2020iniw.md",
-            "CPZ2023" => "CPZ2023.md"
+            "Chan2020iniw" => "Chan2020iniw.md",
+            "Chan2020csv" => "Chan2020csv.md",
+            "BGR2010" => "BGR2010.md"
         ],
         "Forecasting" => "forecasting.md",
         "Structural analysis" => "irfs.md",
