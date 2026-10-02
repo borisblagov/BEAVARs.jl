@@ -18,7 +18,7 @@ Populate a hyperparamater structure for models based on Chan (2020) priors
 @with_kw struct hypChan2020 <: BVARmodelHypSetup
     c1::Float64     = 0.04; # hyperparameter on own lags
     c2::Float64     = 0.01; # hyperparameter on other lags
-    c3::Float64     = 100;  # hyperparameter on the constant
+    c3::Float64     = 100.0;  # hyperparameter on the constant
     ρ::Float64      = 0.8;
     σ_h2::Float64   = 0.1;
     v_h0::Float64    = 5.0; 
@@ -43,7 +43,7 @@ function SUR_form(X,n)
     repX = kron(X,ones(n,1));
     T,k = size(X);
     idi = repeat(1:T*n,inner=k);
-    idj=repeat(1:k*n,T);
+    idj = repeat(1:k*n,T);
     Xout = sparse(idi,idj,vec(repX'));
 
     return Xout

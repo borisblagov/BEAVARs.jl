@@ -514,6 +514,41 @@ function CPZ_draw_wz!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt_inv,Σt_L
 end
 
 
+
+
+@doc raw"""
+    Draw with restrictions
+"""
+function CPZ_draw_wz_alt!(YYt,longyo,Y0,cB,B_draw,structB_draw,sBd_ind,Σt_inv,Σt_LI,Xb,cB_b0_LI,Σ_inv,p,n,Sm_bit,Smsp,Sosp,nm,MOiM,MOiz,Gm,Go,H_B,GΣ,Kym,H_B_CI,nmdraws,Σt_ns_CI)
+    # updating cB
+    BEAVARs.CPZ_update_cB!(cB,B_draw[:,2:end],B_draw[:,1],Y0,cB_b0_LI,p,n)
+
+    # updating H_B
+    @views H_B[H_B_CI] = -structB_draw[sBd_ind];
+    # updating Σ_invFsp
+    #  Σ_invsp.nzval[:] = Σt_inv[Σt_LI];
+    @views Σ_inv[Σt_ns_CI] = Σt_inv[Σt_LI];
+
+    mul!(Gm,H_B,Smsp);
+    mul!(Go,H_B,Sosp);
+    mul!(GΣ,Gm',Σ_inv);
+    mul!(Kym,GΣ,Gm);
+    CL = cholesky(Hermitian(Kym))
+    long_pr = (cB-Go*longyo);
+    μ_y = CL.U\(CL.U'\(GΣ*long_pr));
+
+    KymBar = MOiM + Kym;
+    CLBar = cholesky(Hermitian(KymBar))
+    μ_yBar = CLBar.U\(CLBar.U'\(MOiz + Kym*μ_y))
+    
+    mdraws = zeros(nm,nmdraws)
+    for i_draw in 1:nmdraws
+        mdraws[:,i_draw] = μ_yBar +  ldiv!(CLBar.U,randn(nm,))
+    end    
+    YYt[Sm_bit] = dropdims(median(mdraws,dims=2),dims=2);
+    return YYt
+end
+
 @doc raw"""
     Draw with restrictions
 """

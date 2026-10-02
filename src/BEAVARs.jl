@@ -52,6 +52,7 @@ struct Chan2020iniw_type2 <: BVARmodelOFType end
 struct Chan2020csv_type <: BVARmodelOFType end
 struct BGR2010_type <: BVARmodelOFType end
 struct CPZ2023_type <: BVARmodelMFType end
+struct CPZ2023dev_type <: BVARmodelMFType end
 struct Blagov2025_type <: BVARmodelMFType end
 struct Blagov2027_type <: BVARmodelMFType end
 
@@ -70,6 +71,8 @@ function selectModel(model_str::String)
         model_type = BGR2010_type()
     elseif model_str == "CPZ2023"
         model_type = CPZ2023_type()
+    elseif model_str == "CPZ2023dev"
+        model_type = CPZ2023dev_type()
     elseif model_str == "Blagov2025"
         model_type = Blagov2025_type()
     elseif model_str == "Blagov2027"
@@ -215,6 +218,8 @@ function selectConstLoc(model_str::String)
         const_loc = 0
     elseif model_str == "CPZ2023"
         const_loc = 1
+    elseif model_str == "CPZ2023dev"
+        const_loc = 1
     elseif model_str == "Blagov2025"
         const_loc = 1
     elseif model_str == "Blagov2027"
@@ -237,6 +242,7 @@ include("Chan2020minn.jl")
 include("Chan2020iniw.jl")
 include("Chan2020csv.jl")
 include("CPZ2023.jl")
+include("CPZ2023dev.jl")
 include("Blagov2025.jl")
 include("Blagov2027.jl")
 include("plot_functions.jl")
