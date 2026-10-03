@@ -57,7 +57,7 @@ end
         
     Returns
         Xsur:    matrix with a structure for SUR
-        Xsur_CI: Cartesian indices of the elements in Xsur that are matched to x
+        Xsur_CI: Cartesian indices of the elements  Xsur that are matched to x
         X_CI:    Cartesian indices of the elements of X that are matched to Xsur
 
 """
