@@ -64,32 +64,29 @@ The function implements the homoscedastic Minnesota prior with a SUR form as in 
 # Reference
 Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, https://doi.org/10.1007/978-3-030-31150-6 and https://joshuachan.org/papers/large_BVAR.pdf.
 """
-function Chan2020minn(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup) where Tp <: AbstractFloat
-    @unpack p,n_burn,n_save,prior_RW = VARSetup
+function Chan2020minn(YY::Array{Tp},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where Tp <: AbstractFloat
+    @unpack p,n_burn,n_save,prior_RW = set_struct
     
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
-    (idx_kappa1,idx_kappa2, Vβ_vec, βMinn) = BEAVARs.prior_Minn(n,p,sigmaP,hypSetup,prior_RW)
+    priorMinn_struct = BEAVARs.init_priorMinn(n,p,sigmaP,prior_RW,hyp_struct)
+ 
+    BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
+    Xsur = BEAVARs.XSurFormMatrix(X,n)
 
-    Vβ_inv_vecView[:] = 1.0./Vβ_vec;                # update the diagonal of Vβ_inv
-    Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
-    mul!(XtΣ_inv_den,Xsur_den',Σ_invsp);            #  X'*( I(T) ⊗ Σ^{-1} )
-    mul!(XtΣ_inv_X,XtΣ_inv_den,Xsur_den);           #  X'*( I(T) ⊗ Σ^{-1} )*X
-    K_β[:,:] .= Vβ_inv .+ XtΣ_inv_X;                #  K_β = V^{-1} + X'*( I(T) ⊗ Σ^{-1} )*X
-    prior_ = Vβ_inv*βMinn;                          #  V^-1 * βMinn 
-    # println(prior_)
-    mul!(prior_,XtΣ_inv_den, vec(Y'),1.0,1.0);      # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
-    # println(prior_);
-    cholK_β = cholesky(Hermitian(K_β));             # Cholesky factor
-    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.U',prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
-    
+    β_hat = similar(priorMinn_struct.Vinvβ_prior)
+    β_draw = similar(priorMinn_struct.Vinvβ_prior)
+    β_hat_struct = BEAVARs.make_βdraw_struct(β_draw,β_hat, Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_invsp, K_β)
+    cholK_β = BEAVARs.calc_beta_hat!(priorMinn_struct,β_hat_struct,X,Y);
 
     ndraws = n_save+n_burn;
     store_β=zeros(n^2*p+n,n_save);
-    for ii = 1:ndraws 
-        beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
+
+    for ii = 1:ndraws
+        randn!(β_draw);
+        β_hat_struct.β_draw .= β_hat_struct.β_hat .+ ldiv!(cholK_β.U, β_draw); # draw for β
         if ii>n_burn
-            store_β[:,ii-n_burn] = beta;
+            store_β[:,ii-n_burn] = β_hat_struct.β_draw;
         end
     end
 
@@ -111,9 +108,9 @@ function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     YY = data_mat;
     T,n = size(YY);
     store_YY = fill(NaN,(T+n_fcst,n,n_save))
-    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
+    @time store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF,store_YY);
-    fcast_struct = forecast(out_struct, set_struct, data_struct);
+    fcast_struct = forecast(out_struct, set_struct, data_struct);                   # TODO this has tremendous allocations, fix it
     out_struct.store_YY[:,:,:] =  @view fcast_struct.Yfor3d[:,:,:];
     return out_struct 
 end
@@ -303,4 +300,69 @@ function eval_forecast(out_struct::VAROutput_Chan2020minn,data_struct::BVARmodel
     eval_vint_Chan2020minn_struct = BEAVARs.eval_vint_CPZ2023(pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates)
     return eval_vint_Chan2020minn_struct
     # return pred_lik_mat, fcast_errors_mAd_mat,fcastDatesOverlap,data_true_VecView,data_true_dates
+end
+
+
+# --------------------------------------------------------
+#                       DEPRECIATED
+# These functions were used before but have been depreciated mostly due to performance optimizations
+#
+# --------------------------------------------------------
+
+
+# after implementing all the tricks from the HRLS26 training I got the following speedup
+# from
+# 0.445416 seconds (801.60 k allocations: 197.434 MiB, 64.15% gc time)
+# to
+# 0.141256 seconds (1.62 k allocations: 57.044 MiB) 
+@doc raw"""
+    BEAVARs.Chan2020minn_dep(YY,VARSetup,hypSetup)
+
+Implements the classic homoscedastic Minnesota prior with a SUR form following Chan (2020)
+
+# Arguments
+    YY:         A T x n matrix with the data
+    VARSetup:   A BVARmodelSetup structure with the model setup
+    hypSetup:   A BVARmodelHypSetup structure with the hyperparameters
+# Returns
+    store_β:    A matrix with the posterior draws of the VAR coefficients
+    store_Σ:    A matrix with the posterior draws of the variance-covariance matrix
+
+# Description
+The function implements the homoscedastic Minnesota prior with a SUR form as in Chan (2020).
+
+# Reference
+Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, https://doi.org/10.1007/978-3-030-31150-6 and https://joshuachan.org/papers/large_BVAR.pdf.
+"""
+function Chan2020minn_dep(YY::Array{Tp},VARSetup::BVARmodelSetup,hypSetup::BVARmodelHypSetup) where Tp <: AbstractFloat
+    @unpack p,n_burn,n_save,prior_RW = VARSetup
+    
+    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
+
+    (idx_kappa1,idx_kappa2, Vβ_vec, βMinn) = BEAVARs.prior_Minn(n,p,sigmaP,hypSetup,prior_RW)
+
+    Vβ_inv_vecView[:] = 1.0./Vβ_vec;                # update the diagonal of Vβ_inv
+    Xsur_den[Xsur_CI] = X[X_CI];                    # update Xsur  
+    mul!(XtΣ_inv_den,Xsur_den',Σ_invsp);            #  X'*( I(T) ⊗ Σ^{-1} )
+    mul!(XtΣ_inv_X,XtΣ_inv_den,Xsur_den);           #  X'*( I(T) ⊗ Σ^{-1} )*X
+    K_β[:,:] .= Vβ_inv .+ XtΣ_inv_X;                #  K_β = V^{-1} + X'*( I(T) ⊗ Σ^{-1} )*X
+    prior_ = Vβ_inv*βMinn;                          #  V^-1 * βMinn 
+    # println(prior_)
+    mul!(prior_,XtΣ_inv_den, vec(Y'),1.0,1.0);      # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
+    # println(prior_);
+    cholK_β = cholesky(Hermitian(K_β));             # Cholesky factor
+    beta_hat = ldiv!(cholK_β.U,ldiv!(cholK_β.U',prior_));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+    
+
+    ndraws = n_save+n_burn;
+    store_β=zeros(n^2*p+n,n_save);
+    for ii = 1:ndraws 
+        beta = beta_hat + ldiv!(cholK_β.U,randn(k*n,)); # draw for β
+        if ii>n_burn
+            store_β[:,ii-n_burn] = beta;
+        end
+    end
+
+    store_Σ = repeat(vec(S_0),1,n_save);
+    return store_β, store_Σ
 end

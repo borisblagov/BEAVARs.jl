@@ -6,8 +6,8 @@ makedocs(
     sitename="BEAVARs.jl",
     pages = [
         "Introduction" => "introduction.md",
-        "Estimation" => [
-            "Chan2020minn" => "Chan2020minn.md",
+        "Priors" => [
+            "Minnesota prior" => "Chan2020minn.md",
             "Chan2020iniw" => "Chan2020iniw.md",
             "Chan2020iniw" => "Chan2020iniw.md",
             "Chan2020csv" => "Chan2020csv.md",
