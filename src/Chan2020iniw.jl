@@ -30,7 +30,7 @@ end
     Implements BVAR with Independent Normal Inverse Wishart (iniw) prior following Chan (2020)
 
 """
-function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+function Chan2020iniw_dep(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     @unpack p,n_burn,n_save, prior_RW = VARSetup
     n_draws  = n_save+n_burn;
 
@@ -59,7 +59,8 @@ function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     return store_β, store_Σt
 end
 
-function Chan2020iniw_new(YY,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+
+function Chan2020iniw(YY,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     @unpack p,n_burn,n_save, prior_RW = set_struct
     n_draws  = n_save+n_burn;
 
@@ -74,9 +75,9 @@ function Chan2020iniw_new(YY,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHyp
 
     β_hat_struct = BEAVARs.make_βdraw_struct(similar(priorMinn_struct.Vinvβ_prior),similar(priorMinn_struct.Vinvβ_prior),similar(priorMinn_struct.Vinvβ_prior), Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_invsp, K_β)
 
-    Uvec = similar(vecYt)
-    Σt   = rand(n,n)
-    Σt_inv = similar(Σt)
+    Uvec = similar(vecYt);
+    Σt   = rand(n,n);
+    Σt_inv   = similar(Σt);
     iniw_Σt_struct = BEAVARs.make_iniw_Σt_struct(Uvec,Σt,Σt_inv,S_0,hyp_struct.nu0)
 
 
@@ -85,17 +86,17 @@ function Chan2020iniw_new(YY,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHyp
     store_Σt = zeros(n,n,n_save);
 
 
-for ii = 1:n_draws 
-    BEAVARs.Chan2020_draw_βsur!(priorMinn_struct,β_hat_struct,X,vecYt);
-    BEAVARs.Chan2020_drawΣtsur!(vecYt,β_hat_struct,iniw_Σt_struct,n,T);
-    
-    β_hat_struct.Σ_inv_sp.nzval[:] = iniw_Σt_struct.Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )
-      
-    if ii>n_burn
-        store_β[:,ii-n_burn] = β_hat_struct.β_draw;
-        store_Σt[:,:,ii-n_burn] = iniw_Σt_struct.Σt;
+    for ii = 1:n_draws 
+        BEAVARs.Chan2020_draw_βsur!(priorMinn_struct,β_hat_struct,X,vecYt);
+        BEAVARs.Chan2020_drawΣtsur!(vecYt,β_hat_struct,iniw_Σt_struct,n,T);
+        
+        β_hat_struct.Σ_inv_sp.nzval[:] = iniw_Σt_struct.Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )
+        
+        if ii>n_burn
+            store_β[:,ii-n_burn] = β_hat_struct.β_draw;
+            store_Σt[:,:,ii-n_burn] = iniw_Σt_struct.Σt;
+        end
     end
-end
 
     return store_β, store_Σt
 end
