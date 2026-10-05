@@ -67,6 +67,7 @@ Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Mac
 function Chan2020minn(YY::Array{Tp},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where Tp <: AbstractFloat
     @unpack p,n_burn,n_save,prior_RW = set_struct
     
+    # the function below will be retired in the future
     Y, X, T, n, sigmaP, S_0, Σt_inv, Vβ_inv, Vβ_inv_vecView, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
 
     priorMinn_struct = BEAVARs.init_priorMinn(n,p,sigmaP,prior_RW,hyp_struct)
@@ -76,15 +77,16 @@ function Chan2020minn(YY::Array{Tp},set_struct::BVARmodelSetup,hyp_struct::BVARm
 
     β_hat = similar(priorMinn_struct.Vinvβ_prior)
     β_draw = similar(priorMinn_struct.Vinvβ_prior)
-    β_hat_struct = BEAVARs.make_βdraw_struct(β_draw,β_hat, Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_invsp, K_β)
-    cholK_β = BEAVARs.calc_beta_hat!(priorMinn_struct,β_hat_struct,X,Y);
+    β_rand = similar(priorMinn_struct.Vinvβ_prior)
+    β_hat_struct = BEAVARs.make_βdraw_struct(β_draw, β_hat, Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_invsp, K_β)
+    cholK_β = BEAVARs.calc_β_hat!(priorMinn_struct,β_hat_struct,X,Y);
 
     ndraws = n_save+n_burn;
-    store_β=zeros(n^2*p+n,n_save);
+    store_β= zeros(n^2*p+n,n_save);
 
     for ii = 1:ndraws
-        randn!(β_draw);
-        β_hat_struct.β_draw .= β_hat_struct.β_hat .+ ldiv!(cholK_β.U, β_draw); # draw for β
+        randn!(β_rand);
+        β_hat_struct.β_draw .= β_hat_struct.β_hat .+ ldiv!(cholK_β.U, β_rand); # draw for β
         if ii>n_burn
             store_β[:,ii-n_burn] = β_hat_struct.β_draw;
         end

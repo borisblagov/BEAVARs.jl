@@ -25,3 +25,10 @@ mul!(XtΣ_inv_Xden,XtΣ_inv_den,Xsur_orig);
 @test Xsur == Xsur_orig                 # test whether the Xsur is defined correctly
 @test XtΣ_inv_X ≈ XtΣ_inv_Xden         # test for whether the mul! is implemented correctly
 @test XtΣ_inv_den == XtΣ_inv            # test for whether the mul! is implemented correctly for adjoint
+
+xvec = rand(k*n)
+@test isapprox(Xsur * xvec, Xsur_orig * xvec; atol=1e-12)
+
+yvec = rand(T*n)
+yvec_expected = 0.7 .* (Xsur_orig * xvec) .+ 0.2 .* yvec
+@test isapprox(mul!(yvec, Xsur, xvec, 0.7, 0.2), yvec_expected; atol=1e-12)

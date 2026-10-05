@@ -250,6 +250,19 @@ function Chan2020_drawΣt(Y,Xsur_den,beta,n,T,S_0,nu0)
 end
 
 
+@doc raw"""
+    Chan2020_drawΣtsur(vecYt,β_hat_struct,iniw_Σt_struct,n,T)
+
+    Draw Σt matrix and calculates its inverse using an Inverse Wishart distribution.
+"""
+function Chan2020_drawΣtsur!(vecYt,β_hat_struct,iniw_Σt_struct,n,T)
+    @unpack Uvec, Σt, Σt_inv, S_0, nu0 = iniw_Σt_struct
+    Uvec .= vecYt .- mul!(Uvec,β_hat_struct.Xsur,β_hat_struct.β_draw) 
+    U = reshape(Uvec,n,T);   
+    Σt .= rand(InverseWishart(nu0+n+T,S_0+U*U'));    # draw for Σ
+    Σt_inv .= Σt\I;
+end
+
 
 
 

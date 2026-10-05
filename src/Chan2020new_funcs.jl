@@ -135,9 +135,47 @@ function LinearAlgebra.mul!(
     return C
 end
 
+@doc raw"""
+    C = mul!(C, A::XSurFormMatrix, x::AbstractVector; α=1.0, β=0.0)
+
+    Matrix-vector multiplication for XSurFromMatrix
+
+    # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
+
+"""
+function LinearAlgebra.mul!(
+    y::AbstractVector, A::XSurFormMatrix, x::AbstractVector,
+    α::Number=one(eltype(y)), β::Number=zero(eltype(y)),
+)
+    T, k = size(A.X)
+    n = A.n
+    length(x) == k*n && length(y) == T*n ||
+        throw(DimensionMismatch("incompatible dimensions for SURDesign * vector"))
+
+    @inbounds for t in 1:T, e in 1:n
+        row = (t - 1)*n + e
+        xstart = (e - 1)*k
+            acc = zero(promote_type(eltype(A), eltype(x)))
+        for j in 1:k
+                acc += A.X[t, j] * x[xstart + j]
+            end
+            if iszero(β)
+                y[row] = α * acc
+            else
+                y[row] = β * y[row] + α * acc
+        end
+    end
+    return y
+end
+
 # C = L * A, where A is in SUR form
 @doc raw"""
-  # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
+    C = mul!(C, L::AbstractMatrix, A::XSurFormMatrix; α=1.0, β=0.0)
+
+    Multiplies a general dense matrix with a matrix in SUR form.
+
+    # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
+
 """
 function LinearAlgebra.mul!(
     C::AbstractMatrix, L::AbstractMatrix, A::XSurFormMatrix,
@@ -163,7 +201,11 @@ function LinearAlgebra.mul!(
 end
 
 @doc raw"""
-  # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
+    C = mul!(C, A::Adjoint{XSurFormMatrix}, B::AbstractMatrix; α=1.0, β=0.0)
+
+    Multiplies an adjoint matrix in SUR form with a general dense matrix with.
+
+    # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
 """
 # C = A' * B, for a general dense B
 function LinearAlgebra.mul!(
@@ -191,7 +233,11 @@ end
 
 # Sparse specialization: skips zero entries in B as well as the zeros in A.
 @doc raw"""
-  # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
+    C = mul!(C, A::Adjoint{XSurFormMatrix}, B::SparseMatrixCSC; α=1.0, β=0.0)
+
+    Multiplies an adjoint matrix in SUR form with a sparse matrix with.
+
+    # This function was written by an LLM. There is a test in the test suite that checks the correctness against my own implementation.
 """
 function LinearAlgebra.mul!(
     C::AbstractMatrix, At::Adjoint{<:Any,<:XSurFormMatrix},
@@ -343,7 +389,7 @@ function update_priorMinn!(prior_struct::BEAVARs.BVARpriorMinn,hyp_struct::BEAVA
 end
 
 
-function calc_beta_hat!(prior_struct,β_hat_struct,X,Y)
+function calc_β_hat!(prior_struct,β_hat_struct,X,Y)
     @unpack Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_inv_sp, K_β, β_hat = β_hat_struct;
     @unpack Vβ_vec, Vβ_inv, Vβ_inv_vecView, β_prior,Vinvβ_prior = prior_struct;
     Vβ_inv_vecView[:] .= 1.0./Vβ_vec;                   # update the diagonal of Vβ_inv
@@ -361,15 +407,44 @@ function calc_beta_hat!(prior_struct,β_hat_struct,X,Y)
 end
 
 
+function Chan2020_draw_βsur!(prior_struct,β_hat_struct,X,vecYt)
+    @unpack Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_inv_sp, K_β, β_hat, β_draw, β_rand  = β_hat_struct;
+    @unpack Vβ_vec, Vβ_inv, Vβ_inv_vecView, β_prior,Vinvβ_prior = prior_struct;
+    Vβ_inv_vecView[:] .= 1.0./Vβ_vec;                   # update the diagonal of Vβ_inv
+    update_Xsur!(Xsur, X);                              # update Xs                   
+    mul!(Vinvβ_prior, Vβ_inv, β_prior)                  #  update V^-1 * β_Minn 
+
+    mul!(XtΣ_inv_den,Xsur',Σ_inv_sp);                   #  X'*( I(T) ⊗ Σ^{-1} )
+    mul!(XtΣ_inv_X,XtΣ_inv_den,Xsur);
+    K_β .= Vβ_inv .+ XtΣ_inv_X;                         #  K_β = V^{-1} + X'*( I(T) ⊗ Σ^{-1} )*X
+    mul!(Vinvβ_prior,XtΣ_inv_den, vecYt,1.0,1.0);     # (V^-1_Minn * beta_Minn) + X' ( I(T) ⊗ Σ-1 ) y
+
+    cholK_β = cholesky(Hermitian(K_β));                # Cholesky factor
+    β_hat[:] = ldiv!(cholK_β.U,ldiv!(cholK_β.U',Vinvβ_prior));    # C'\(C*(V^-1_Minn * beta_Minn + X' ( I(T) ⊗ Σ-1 ) y)
+    randn!(β_rand)
+    β_draw[:] .= β_hat .+ ldiv!(cholK_β.U,β_rand); # draw for β
+end
+
+
 
 struct make_βdraw_struct{T <: AbstractFloat}
-    β_draw::Array{T,1}        # 
-    β_hat::Array{T,1}        # 
+    β_draw::Array{T,1}        # final draw of β
+    β_hat::Array{T,1}         #  posterior mean of β
+    β_rand::Array{T,1}        # random draw
     Xsur::XSurFormMatrix{T}         # 
     XtΣ_inv_den::Array{T,2}         # 
     XtΣ_inv_X::Array{T,2}         # 
     Σ_inv_sp::SparseMatrixCSC{T,Int}  #
-    K_β::Array{T,2} # 
+    K_β::Array{T,2}             # 
+end
+
+
+struct make_iniw_Σt_struct{T <: AbstractFloat}
+    Uvec::Array{T,1}
+    Σt::Array{T,2}
+    Σt_inv::Array{T,2}
+    S_0::Diagonal{T}
+    nu0::Int
 end
 
 

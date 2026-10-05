@@ -59,6 +59,48 @@ function Chan2020iniw(YY,VARSetup::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     return store_β, store_Σt
 end
 
+function Chan2020iniw_new(YY,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+    @unpack p,n_burn,n_save, prior_RW = set_struct
+    n_draws  = n_save+n_burn;
+
+    # the function below will be retired in the future
+    Y, X, T, n, sigmaP, S_0, Σt_inv, Vβminn_inv, Vβminn_inv_elview, Σ_invsp, Σt_LI, XtΣ_inv_den, XtΣ_inv_X, Xsur_den, Xsur_CI, X_CI, k, K_β, beta, intercept, betOLS = BEAVARs.init_Minn(YY,p);
+    vecYt = vec(Y');
+
+    priorMinn_struct = BEAVARs.init_priorMinn(n,p,sigmaP,prior_RW,hyp_struct)
+
+    # BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
+    Xsur = BEAVARs.XSurFormMatrix(X,n)
+
+    β_hat_struct = BEAVARs.make_βdraw_struct(similar(priorMinn_struct.Vinvβ_prior),similar(priorMinn_struct.Vinvβ_prior),similar(priorMinn_struct.Vinvβ_prior), Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_invsp, K_β)
+
+    Uvec = similar(vecYt)
+    Σt   = rand(n,n)
+    Σt_inv = similar(Σt)
+    iniw_Σt_struct = BEAVARs.make_iniw_Σt_struct(Uvec,Σt,Σt_inv,S_0,hyp_struct.nu0)
+
+
+    # allocate output for saving
+    store_β = zeros(n^2*p+n,n_save);
+    store_Σt = zeros(n,n,n_save);
+
+
+for ii = 1:n_draws 
+    BEAVARs.Chan2020_draw_βsur!(priorMinn_struct,β_hat_struct,X,vecYt);
+    BEAVARs.Chan2020_drawΣtsur!(vecYt,β_hat_struct,iniw_Σt_struct,n,T);
+    
+    β_hat_struct.Σ_inv_sp.nzval[:] = iniw_Σt_struct.Σt_inv[Σt_LI];               # update ( I(T) ⊗ Σ^{-1} )
+      
+    if ii>n_burn
+        store_β[:,ii-n_burn] = β_hat_struct.β_draw;
+        store_Σt[:,:,ii-n_burn] = iniw_Σt_struct.Σt;
+    end
+end
+
+    return store_β, store_Σt
+end
+
+
 
 
 #-------------------------------------
@@ -73,7 +115,7 @@ function beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
     datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
     fdatesLF = [datesLF;datesLF_fcast];
     YY = values(data_struct.data_tab);
-    store_β, store_Σ = Chan2020iniw(YY,set_struct,hyp_str);
+    @time store_β, store_Σ = Chan2020iniw(YY,set_struct,hyp_str);
     out_struct = VAROutput_Chan2020iniw(store_β,store_Σ,YY,fdatesLF)
     return out_struct
 end
