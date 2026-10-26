@@ -103,6 +103,73 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
 end
 
 
+@doc raw"""
+    makeM_crosssect(csWeights_timetab,idx_mat,varNamesLF,missingTab_in,zTab_in,Nm)
+
+Builds a cross-sectional mapping matrix `M` such that `z = M*y_M`, where each
+row combines missing high-frequency variables using the date-specific weights
+in `csWeights_timetab`.
+
+# Arguments
+    csWeights_timetab: A `TimeArray` of cross-sectional weights, indexed by date
+    idx_mat:            A `T_z × length(varNamesLF)` matrix of 1-based positions
+                        into the missing-value vector `y_M`
+    varNamesLF:         Weight-column names, in the same order as the columns of
+                        `idx_mat`
+    missingTab_in:      A `TimeArray` identifying the dates and variables in `y_M`
+    zTab_in:            A `TimeArray` containing the constrained observations
+    Nm:                 Length of the missing-value vector `y_M`
+
+`idx_mat` rows must correspond to the dates in `zTab_in` and `missingTab_in`.
+When the weight table has one row, its weights are reused for every date;
+otherwise, it must contain every date in `missingTab_in`.
+
+Returns `(M, z, T_z)`, where `z` contains the values of `zTab_in`.
+"""
+function makeM_crosssect(csWeights_timetab,idx_mat::AbstractMatrix{<:Integer},varNamesLF,missingTab_in,zTab_in,Nm)
+    T_z = size(zTab_in,1)
+    nLF = length(varNamesLF)
+    z_dates = timestamp(zTab_in)
+    missing_dates = timestamp(missingTab_in)
+    weight_dates = timestamp(csWeights_timetab)
+    weight_names = colnames(csWeights_timetab)
+
+    size(idx_mat) == (T_z,nLF) ||
+        throw(DimensionMismatch("idx_mat must have size ($T_z, $nLF), got $(size(idx_mat))"))
+    size(missingTab_in,1) == T_z ||
+        throw(DimensionMismatch("missingTab_in must have $T_z rows, got $(size(missingTab_in,1))"))
+    missing_dates == z_dates ||
+        throw(ArgumentError("zTab_in and missingTab_in must contain the same dates in the same order"))
+    Nm >= 0 || throw(ArgumentError("Nm must be nonnegative"))
+    all(name -> name in weight_names,varNamesLF) ||
+        throw(ArgumentError("Every name in varNamesLF must be a column in csWeights_timetab"))
+    all(index -> 1 <= index <= Nm,idx_mat) ||
+        throw(ArgumentError("Every index in idx_mat must be between 1 and Nm"))
+
+    weight_rows = if length(weight_dates) == 1
+        ones(Int,T_z)
+    else
+        weight_row_by_date = Dict(date => row for (row,date) in enumerate(weight_dates))
+        missing_weight_dates = filter(date -> !haskey(weight_row_by_date,date),missing_dates)
+        isempty(missing_weight_dates) ||
+            throw(ArgumentError("csWeights_timetab is missing weights for dates: $(missing_weight_dates)"))
+        [weight_row_by_date[date] for date in missing_dates]
+    end
+    weight_values = values(csWeights_timetab[Symbol.(varNamesLF)])
+    if ndims(weight_values) == 1
+        weight_values = reshape(weight_values,:,1)
+    end
+
+    M_out = zeros(Float64,T_z,Nm)
+    for ii in 1:T_z
+        M_out[ii,idx_mat[ii,:]] .= weight_values[weight_rows[ii],:]
+    end
+
+    z_out = values(zTab_in)
+    return M_out,z_out,T_z
+end
+
+
 
 @doc raw"""
     M_inter_agg = makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp)

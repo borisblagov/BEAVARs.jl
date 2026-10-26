@@ -166,6 +166,7 @@ end
     const_loc::Int  # location of the constant
     prior_RW::Int   # 1 for random walk prior (Y = B1*Y_tm1 + .... with B1 being identity matrix), or 0 for B1 = zeros(n,n), #TODO add for OLS (persistent), #TODO add for mix
     est_hyp::Bool   # set to true to estimate hyperparameters
+    show_prog::Bool # set to true to show the progressbar (default)
 end
 
 # types for forecast output export
@@ -225,7 +226,7 @@ Only the first argument is mandatory, rest is optional with default values.
 
 See also [`hypChan2020`](@ref), [`hypBGR2010`](@ref).
 """
-function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct(),prior_RW::Int = 0,est_hyp=false)
+function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct(),prior_RW::Int = 0,est_hyp=false,show_prog=true)
     model_type = BEAVARs.selectModel(model_str)
     # checking if user supplied the hyperparameter structure
     if isa(hyp,hypDefault_struct)                        # if not supplied, make a default one
@@ -236,7 +237,7 @@ function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,
 
     intercept = BEAVARs.selectConstLoc(model_str);
     
-    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept,prior_RW,est_hyp);
+    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept,prior_RW,est_hyp,show_prog);
     return model_type, set_struct, hyp_struct
 end
 

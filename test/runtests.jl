@@ -21,6 +21,10 @@ using BlockBandedMatrices, BlockArrays
         include("testset_CPZ2023.jl")    
     end
 
+    @testset "testset_mf_functions.jl" begin
+        include("testset_mf_functions.jl")
+    end
+
     @testset "test_update_hyp_and_llm.jl" begin
         include("test_update_hyp_and_llm.jl")
     end

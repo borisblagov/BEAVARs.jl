@@ -124,7 +124,11 @@ function xlsx2ta(data_mat)
     return dataf_TA
 end
 
+@doc raw""" 
+    readSpecMF(modelstr,data_path)
 
+    Reads custom Excel file and formats the data for use in Julia
+"""
 function readSpecMF(modelstr,data_path)
     xf = XLSX.readxlsx(data_path);
     sh_names = XLSX.sheetnames(xf)
@@ -173,6 +177,55 @@ function readSpecMF(modelstr,data_path)
 
 end
 
+@doc raw"""
+
+
+    reads weights for time series cross-sectional aggregation from a custom sheet
+"""
+function read_spec_weights(sheet_name,data_path)
+    data_path = "data/Specification_weights_nrw.xlsx"
+    xf = XLSX.readxlsx(data_path);
+    sh_names = XLSX.sheetnames(xf)
+    sh_ref = xf[sheet_name];
+    sh_mat = sh_ref[:]
+    dates = Date.(Int.(sh_mat[2:end, 1]), 1, 1)
+    values = Float64.(sh_mat[2:end, 2:end])
+    colnames = Symbol.(String.(sh_mat[1, 2:end]))
+    ta=TimeArray(dates, values, colnames)
+    return ta
+end
+
+
+function expand_weights_annual(ta::TimeArray; frequency::Symbol = :quarterly)
+    months_per_period = if frequency == :quarterly
+        3
+    elseif frequency == :monthly
+        1
+    else
+        throw(ArgumentError("frequency must be :quarterly or :monthly"))
+    end
+
+    annual_dates = timestamp(ta)
+    annual_values = values(ta)
+    years = year.(annual_dates)
+
+    # Generate period-start dates, from January of the first year
+    # through the final quarter/month of the last year.
+    dates = [
+        Date(y, m, 1)
+        for y in first(years):last(years)
+        for m in 1:months_per_period:12
+    ]
+
+    # Use the corresponding annual row for every generated date.
+    row_for_year = Dict(y => i for (i, y) in enumerate(years))
+    expanded_values = annual_values[
+        [row_for_year[year(d)] for d in dates], :
+    ]
+
+    return TimeArray(dates, expanded_values, colnames(ta))
+end
+
 
 function readSpecOF(modelstr,data_path)
     xf = XLSX.readxlsx(data_path);
@@ -209,6 +262,8 @@ function readSpecOF(modelstr,data_path)
     return lf_ta, varListF
 
 end
+
+
 
 
 

@@ -82,7 +82,7 @@ Implements the mixed-frequency BVAR model as in Blagov et al. (2025)
 The function implements the mixed-frequency BVAR model as in Blagov et al. (2027).
 """
 function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},varOrder::Array{Symbol,1},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, Ntyp, Dtyp, Atyp <: AbstractArray{Typ, Ntyp}}
-    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp = set_struct
+    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp, show_prog = set_struct
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
@@ -147,7 +147,10 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     store_c1 = zeros(n_save,);
     store_c2 = zeros(n_save,);
             
-    progress_bar = Progress(ndraws; dt=1.0)
+    if show_prog == true
+        progress_bar = Progress(ndraws; dt=1.0)
+    end
+    
     for ii = 1:ndraws
     
         # updating pbsi_struct with Σt_inv.
@@ -200,8 +203,9 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
         end
 
         # show progress bar
-        next!(progress_bar, showvalues = generate_showvalues(ii, ndraws))
-
+        if show_prog == true
+            next!(progress_bar, showvalues = generate_showvalues(ii, ndraws))
+        end
     end
     store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
     return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
