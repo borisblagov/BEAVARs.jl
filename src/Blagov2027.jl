@@ -14,8 +14,12 @@ end
 function beavar(::Blagov2027_type, set_struct, hyp_struct, data_struct)
     println("Hello Blagov2027")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
-    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = Blagov2027(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
-    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h,store_ρ,store_σ_h2,store_eh,M_inter_agg, fdatesHF, fdatesLF);
+    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = Blagov2027(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
+    YYforHF_struct = makeProbabilityIntervalsStruct(store_YY,fdatesHF,var_list);
+    YYforLF_struct = makeProbabilityIntervalsStruct(store_YY_LF,fdatesLF,var_list);
+    data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position of the low-frequency variable
+    forecast_flags_vec = .!data_flags_vec;                          # bit_vector showing the forecasted position. Only supports balanced z_tab #TODO: make it work for unbalanced z_tab
+    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h,store_ρ,store_σ_h2, store_eh, store_c1,store_c2, M_inter_agg, fdatesHF, fdatesLF, YYforLF_struct, YYforHF_struct,data_flags_vec,forecast_flags_vec);
     return out_struct
 end
 
@@ -78,14 +82,14 @@ Implements the mixed-frequency BVAR model as in Blagov et al. (2025)
 The function implements the mixed-frequency BVAR model as in Blagov et al. (2027).
 """
 function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},varOrder::Array{Symbol,1},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, Ntyp, Dtyp, Atyp <: AbstractArray{Typ, Ntyp}}
-    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW = set_struct
+    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp = set_struct
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
     fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, n_fcst_hf = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     fdatesHF = timestamp(fdataHF_tab);
     fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
-    M_inter_agg = BEAVARs.CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
+    M_inter_agg = BEAVARs.makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp);
 
     YYwNA   = values(fdataHF_tab);
 
@@ -100,7 +104,7 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     nm      = sum(Sm_bit);          # the number of missing values
     longyo  = vYYt[vec(So_bit)];    # observed values, should not change ever
 
-    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
 
     Y0 = @views YY[1:p,:];     # this is just a view, so if we update YY, we update this
     if any(isnan.(Y0))
@@ -140,7 +144,10 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     store_ρ = zeros(n_save,);
     store_σ_h2 = zeros(n_save,); 
     store_eh = zeros(T,n_save);
-
+    store_c1 = zeros(n_save,);
+    store_c2 = zeros(n_save,);
+            
+    progress_bar = Progress(ndraws; dt=1.0)
     for ii = 1:ndraws
     
         # updating pbsi_struct with Σt_inv.
@@ -171,6 +178,13 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
         # update full h beyond t=T and before t=1
         BEAVARs.update_hf_expmhf!(hf,expmhf,csv_h_struct, Tf, T, p)
 
+        if est_hyp == true
+            κ1, κ2 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p)
+            hyp_struct = hypChan2020(c1=κ1,c2=κ2);
+            BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
+        end
+
+
         if ii>n_burn
             store_YY[:,:,ii-n_burn]  = YY;
             store_β[:,ii-n_burn] = β_hat_bb_struct.β_draw;
@@ -181,11 +195,16 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
+            store_c1[ii-n_burn,] = hyp_struct.c1;
+            store_c2[ii-n_burn,] = hyp_struct.c2;
         end
+
+        # show progress bar
+        next!(progress_bar, showvalues = generate_showvalues(ii, ndraws))
 
     end
     store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
-    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
+    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
 
 end
 
@@ -195,24 +214,30 @@ end
 
 #------------------------------
 # Output structure
-@with_kw struct VAROutput_Blagov2027 <: BVARmodelOutput
-    store_YY::Array{}
-    store_YY_LF::Array{}
-    store_β::Array{}        # 
-    store_Σt_inv::Array{}        # 
-    M_zsp::Array{} 
-    z_vec::Array{} 
-    Sm_bit::Array{}
-    freq_mix_tp
-    store_Σt::Array{}        # 
-    store_h::Array{}        # 
-    store_s2_h::Array{}     # 
-    store_ρ::Array{}        # 
-    store_σ_h2::Array{}     # 
-    store_eh::Array{}       #
-    M_inter_agg::Array{}
-    fdatesHF::Array{Date, 1}
-    fdatesLF::Array{Date, 1}
+@with_kw struct VAROutput_Blagov2027{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelOutput
+    store_YY::Array{T,3}
+    store_YY_LF::Array{T,3}
+    store_β::Array{T,N}        # 
+    store_Σt_inv::Array{T,3}        # 
+    M_zsp::Array{T,N} 
+    z_vec::Array{T,1} 
+    Sm_bit::BitArray{N}
+    freq_mix_tp::Tuple{Int,Int,Int}
+    store_Σt::Array{T,3}        # 
+    store_h::Array{T,N}        # 
+    store_s2_h::Array{T,N}     # 
+    store_ρ::Array{T,1}        # 
+    store_σ_h2::Array{T,1}     # 
+    store_eh::Array{T,N}       #
+    store_c1::Array{T,1}       #
+    store_c2::Array{T,1}       #
+    M_inter_agg::Array{T,N}
+    fdatesHF::Array{D, 1}
+    fdatesLF::Array{D, 1}
+    YYforLF_struct::probability_intervals_struct{T,N,D,A}
+    YYforHF_struct::probability_intervals_struct{T,N,D,A}
+    data_flags_vec::BitVector              # bit vector showing the position of the data in low-frequency in the output. Only supports balanced z_tab 
+    forecast_flags_vec::BitVector          # bit vector showing the position of the low-frequency forecasts in the output
 end
 # end of output strcutres
 #------------------------------
@@ -344,7 +369,7 @@ function Blagov2027_createMagg(timeHF,freq_mix)
     tempZ_tab = TimeArray(timeLF,fill(NaN,(length(timeLF))));       # make a temporary z_tab to get an M matrix to convert monthly to quarterly for each series
     tempSm_bit = isnan.(tempYYt);
     nm = sum(tempSm_bit);
-    out_tup = BEAVARs.CPZ_makeM_inter(tempZ_tab,tempYYt,tempSm_bit,timeHF_sh,colnames(tempZ_tab),colnames(tempZ_tab),freq_mix,nm,Tpfhor;scVal=10e-8)
+    out_tup = BEAVARs.makeM_intertemp(tempZ_tab,tempYYt,tempSm_bit,timeHF_sh,colnames(tempZ_tab),colnames(tempZ_tab),freq_mix,nm,Tpfhor;scVal=10e-8)
 
     Magg = out_tup[1];
     return Magg, timeLF
@@ -375,58 +400,77 @@ function Blagov2027_hf2lf(out_struct,Magg,var_name::Symbol)
 end
 
 
+@doc raw"""
+    makeProbabilityIntervalsStruct(YYforLF3d,fdatesLF,var_list)
+    
+    Calculate the percentiles needed for 68%, 90%, and 95% probability intervals from an array with draws across the third dimension
+
+"""
+function makeProbabilityIntervalsStruct(YYforLF3d,fdatesLF,var_list)
+
+    YY_low025, YY_low05, YY_low16, YforLF_med, YY_hih84, YY_hih95, YY_hih975 = get_imp_percentiles(YYforLF3d) 
+
+    YY_low025_tab = rename!(TimeArray(fdatesLF,YY_low025),var_list);
+    YY_low05_tab = rename!(TimeArray(fdatesLF,YY_low05),var_list);
+    YY_low16_tab = rename!(TimeArray(fdatesLF,YY_low16),var_list);
+    YY_med_tab = rename!(TimeArray(fdatesLF,YforLF_med),var_list);
+    YY_hih84_tab = rename!(TimeArray(fdatesLF,YY_hih84),var_list);
+    YY_hih95_tab = rename!(TimeArray(fdatesLF,YY_hih95),var_list);
+    YY_hih975_tab = rename!(TimeArray(fdatesLF,YY_hih975),var_list);
+
+    # save them in a structure with [5%, 16%, 50%, 84%, 95%] probability intervals for each variable and each time point
+    YY_pi_struct = BEAVARs.probability_intervals_struct(YY_low025_tab, YY_low05_tab, YY_low16_tab, YY_med_tab, YY_hih84_tab, YY_hih95_tab, YY_hih975_tab);
+    return YY_pi_struct
+end
 
 
 #--------------------------------------
 # Forecast Block for Blagov2027
 @doc raw"""
+    makeForecast(VAROutput::VAROutput_Blagov2027,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
 
+    Should be depreciated
 """
-function forecast(VAROutput::VAROutput_Blagov2027,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
-    # TODO change these lines to using the function get_imp_percentiles
+function makeForecast(VAROutput::VAROutput_Blagov2027,VARSetup::BVARmodelSetup,data_struct::BVARmodelDataSetup)
     @unpack store_β, store_Σt, store_YY, M_inter_agg, fdatesHF, fdatesLF = VAROutput
     @unpack n_fcst,p,n_save = VARSetup
     @unpack dataHF_tab, dataLF_tab, var_list = data_struct
     YYforHF3d = store_YY;
     YYforLF3d = mapslices(x->M_inter_agg*x,store_YY,dims=1:2)
 
-    # Calculate the percentiles for the forecast distribution for the low frequency and high-frequency variables
-    YforLF_low1 = percentile_mat(YYforLF3d,0.05,dims=3);
-    YforLF_low = percentile_mat(YYforLF3d,0.16,dims=3);
-    YforLF_med = percentile_mat(YYforLF3d,0.5,dims=3);
-    YforLF_hih = percentile_mat(YYforLF3d,0.84,dims=3);
-    YforLF_hih1 = percentile_mat(YYforLF3d,0.95,dims=3);
+    # Calculate the percentiles for the forecast distribution for the low frequency variables
+    YYforLF_low025, YYforLF_low05, YYforLF_low16, YforLF_med, YYforLF_hih84, YYforLF_hih95, YYforLF_hih975 = get_imp_percentiles(YYforLF3d) 
 
-    YYforLF_low05_tab = rename!(TimeArray(fdatesLF,YforLF_low1),var_list);
-    YYforLF_low16_tab = rename!(TimeArray(fdatesLF,YforLF_low),var_list);
+    YYforLF_low025_tab = rename!(TimeArray(fdatesLF,YYforLF_low025),var_list);
+    YYforLF_low05_tab = rename!(TimeArray(fdatesLF,YYforLF_low05),var_list);
+    YYforLF_low16_tab = rename!(TimeArray(fdatesLF,YYforLF_low16),var_list);
     YYforLF_med_tab = rename!(TimeArray(fdatesLF,YforLF_med),var_list);
-    YYforLF_hih84_tab = rename!(TimeArray(fdatesLF,YforLF_hih),var_list);
-    YYforLF_hih95_tab = rename!(TimeArray(fdatesLF,YforLF_hih1),var_list);
+    YYforLF_hih84_tab = rename!(TimeArray(fdatesLF,YYforLF_hih84),var_list);
+    YYforLF_hih95_tab = rename!(TimeArray(fdatesLF,YYforLF_hih95),var_list);
+    YYforLF_hih975_tab = rename!(TimeArray(fdatesLF,YYforLF_hih975),var_list);
 
     # now for the high-frequency variables
-    YforHF_low1 = percentile_mat(YYforHF3d,0.05,dims=3);
-    YforHF_low = percentile_mat(YYforHF3d,0.16,dims=3);
-    YforHF_med = percentile_mat(YYforHF3d,0.5,dims=3);
-    YforHF_hih = percentile_mat(YYforHF3d,0.84,dims=3);
-    YforHF_hih1 = percentile_mat(YYforHF3d,0.95,dims=3);
+    YYforHF_low025, YYforHF_low05, YYforHF_low16, YforHF_med, YYforHF_hih84, YYforHF_hih95, YYforHF_hih975 = get_imp_percentiles(YYforHF3d) 
 
-    YYforHF_low05_tab = rename!(TimeArray(fdatesHF,YforHF_low1),var_list);
-    YYforHF_low16_tab = rename!(TimeArray(fdatesHF,YforHF_low),var_list);
+    YYforHF_low025_tab = rename!(TimeArray(fdatesHF,YYforHF_low025),var_list);
+    YYforHF_low05_tab = rename!(TimeArray(fdatesHF,YYforHF_low05),var_list);
+    YYforHF_low16_tab = rename!(TimeArray(fdatesHF,YYforHF_low16),var_list);
     YYforHF_med_tab = rename!(TimeArray(fdatesHF,YforHF_med),var_list);
-    YYforHF_hih84_tab = rename!(TimeArray(fdatesHF,YforHF_hih),var_list);
-    YYforHF_hih95_tab = rename!(TimeArray(fdatesHF,YforHF_hih1),var_list);
+    YYforHF_hih84_tab = rename!(TimeArray(fdatesHF,YYforHF_hih84),var_list);
+    YYforHF_hih95_tab = rename!(TimeArray(fdatesHF,YYforHF_hih95),var_list);
+    YYforHF_hih975_tab = rename!(TimeArray(fdatesHF,YYforHF_hih975),var_list);
 
     # save them in a structure with [5%, 16%, 50%, 84%, 95%] probability intervals for each variable and each time point
-    YYforLF_struct = BEAVARs.data_fcast_PI(YYforLF_low05_tab, YYforLF_low16_tab, YYforLF_med_tab, YYforLF_hih84_tab, YYforLF_hih95_tab);
-    YYforHF_struct = BEAVARs.data_fcast_PI(YYforHF_low05_tab, YYforHF_low16_tab, YYforHF_med_tab, YYforHF_hih84_tab, YYforHF_hih95_tab);
+    YYforLF_struct = BEAVARs.data_probability_intervals(YYforLF_low025_tab, YYforLF_low05_tab, YYforLF_low16_tab, YYforLF_med_tab, YYforLF_hih84_tab, YYforLF_hih95_tab, YYforLF_hih975_tab);
+    YYforHF_struct = BEAVARs.data_probability_intervals(YYforHF_low025_tab,YYforHF_low05_tab, YYforHF_low16_tab, YYforHF_med_tab, YYforHF_hih84_tab, YYforHF_hih95_tab,YYforHF_hih975_tab);
 
-    data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position
+    data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position of the low-frequency variable
     forecast_flags_vec = .!data_flags_vec;                          # bit_vector showing the forecasted position. Only supports balanced z_tab #TODO: make it work for unbalanced z_tab
     fcast_struct = BEAVARs.VAR_MF_Forecast(YYforHF3d,YYforLF3d,dataHF_tab,dataLF_tab,var_list,n_fcst,YYforHF_struct,YYforLF_struct,data_flags_vec,forecast_flags_vec)    
 
     return fcast_struct
 
-end # end function fcastCPZ2023()
+end # end function
 
 
 
@@ -443,3 +487,17 @@ function update_hf_expmhf!(hf,expmhf,csv_h_struct,Tf, T, p)
     end
     expmhf .= exp.(-hf);
 end
+
+
+function plot_mf_summary(out_struct::VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
+    freq_mix_label_tuple = BEAVARs.int2strMF(out_struct.freq_mix_tp);
+    BEAVARs.plot_YY(out_struct.YYforHF_struct,data_struct.var_list,supertitle="Figure 1: "*freq_mix_label_tuple[1]*" variables")
+    BEAVARs.plot_YY(out_struct.YYforLF_struct,data_struct.var_list,supertitle="Figure 1: "*freq_mix_label_tuple[2]*" variables")
+    BEAVARs.plot_minn_hyperparameters(out_struct)
+end
+
+
+
+# for progress bar evaulation
+generate_showvalues(iter, x) = () -> [("Draw #:",iter), ("Total draws",x)];
+    

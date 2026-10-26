@@ -34,7 +34,7 @@ end
 
 
 function fanChart(toPlot_mat,dates::Array{Date, 1})
-    prct_dim = length(size(toPlot_mat)); # the dimension with the draws (always theh last)
+    prct_dim = length(size(toPlot_mat)); # the dimension with the draws (always the last)
     if prct_dim == 3
         n=size(toPlot_mat,2);
     elseif prct_dim ==2
@@ -118,3 +118,38 @@ function forecast_plot(fcast_struct::VARForecast;plot_fcastOnly=1)
     display(p_hnd)
 
 end
+
+
+
+
+
+function plot_YY(YYfor_struct,var_list;supertitle="",monitor_size=(1920, 1080))
+    n = size(YYfor_struct.YYfor_med_tab,2)
+    if n < 4
+        lout = (n,1)
+    elseif n == 4
+        lout = (2,2)
+    elseif n>4 
+        lout = (convert(Int,ceil(n/4)),4)
+    end
+
+    p_hand = plot(layout=lout,size = monitor_size, suptitle=supertitle)
+    for ik in eachindex(var_list)
+        var_name = var_list[ik];
+        plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=0;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low05_tab[var_name]),values(YYfor_struct.YYfor_hih95_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.1,color=1,legend=false,subplot=ik);
+        plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=2;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low16_tab[var_name]),values(YYfor_struct.YYfor_hih84_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.2,color=1,legend=false,subplot=ik,title=var_name); 
+        
+    end
+    display(p_hand)
+end
+
+
+
+function plot_minn_hyperparameters(out_struct_csv;supertitle="Figure 3: Hyperparameters",monitor_size=(800, 400))
+    p_hand = plot(layout= (1,2),size = monitor_size, suptitle=supertitle)
+    histogram!(p_hand,out_struct_csv.store_c1,subplot=1,title="κ1",legend=false);         
+    histogram!(p_hand,out_struct_csv.store_c2,subplot=2,title="κ2",legend=false);         
+    display(p_hand)
+end
+
+

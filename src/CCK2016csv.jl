@@ -308,67 +308,6 @@ end
 
 
 
-function csv_draw_h_fc!(csv_h_struct, n,T,hyp_struct)
-    @unpack v_h0, S_h0, ρ_0, V_ρ = hyp_struct
-    @unpack h, expmh, ht, eht, new_ht, sieht, G_h, f_h, s2_h, eh, H_ρ, ρ_vec,σ_h2_vec, K_h = csv_h_struct
-    accept = false;
-    ρ = ρ_vec[1]; 
-    σ_h2 = σ_h2_vec[1];
-    # H_ρ[diagind(H_ρ,-1)]=fill(-ρ,T-1);
-    H_ρ.nzval[2:2:end].=-ρ;
-    H_inv = H_ρ'*(Diagonal([(1.0-ρ^2)/σ_h2; 1.0/σ_h2*ones(T-1,)]))*H_ρ;
-    ϵ_h = 1.0;
-    ht .= h; 
-    
-    while ϵ_h > 10^(-3)
-        eht .= exp.(ht)
-        sieht .= s2_h[:,]./eht
-        G_h .= 0.5*sieht
-        f_h .= -n*0.5 .+ G_h;
-        K_h .= H_inv .+ Diagonal(G_h);
-        new_ht .= K_h\(f_h + G_h.*ht)
-        ϵ_h = maximum(abs.(new_ht-ht))
-        ht[:,] = new_ht[:,]
-    end
-
-    C_K_h = cholesky(K_h)
-    
-    hstar = similar(ht)
-    hstar .= ht
-    logc = -0.5*hstar'*H_inv*hstar - 0.5*n*sum(hstar) .- 0.5*exp.(-hstar)'*s2_h[:,] .+ log(3)
-    
-    flag = false
-    hc = similar(h)
-    alpARc = 0.0;
-    while flag == 0
-        hc = ht + C_K_h.U\randn(T,);        
-        alpARc = -0.5*hc'*H_inv*hc .- (0.5*n)*sum(hc,dims=1)[1] .- 0.5*exp.(-hc)'*s2_h[:,] .+ 0.5*(hc-ht)'*K_h*(hc-ht) .- logc;
-        
-        if alpARc > log(rand())
-            flag = true;
-        end
-    end        
-    alpAR = -0.5*h'*H_inv*h .- (0.5*n)*sum(h) .- 0.5*exp.(-h)'*s2_h[:,] .+ 0.5*(h-ht)'*K_h*(h-ht) .- logc;
-    if alpAR < 0
-        alpMH = 1.0;
-    elseif alpARc < 0
-        alpMH = - alpAR;
-    else
-        alpMH = alpARc - alpAR;
-    end    
-    if alpMH > log(rand())
-        h[:,] = hc[:,]; 
-        accept = true;
-    end
-
-    # update exp.(-h)
-    expmh .= exp.(-h);
-
-end 
-
-
-
-
 function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     # @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hyp_struct
     @unpack p, n_save, n_burn, prior_RW, est_hyp = set_struct

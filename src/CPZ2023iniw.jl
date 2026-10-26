@@ -10,8 +10,12 @@
 function beavar(::CPZ2023iniw_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello CPZ2023iniw")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
-    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = CPZ2023iniw(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
-    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h,store_ρ,store_σ_h2,store_eh,M_inter_agg, fdatesHF, fdatesLF);
+    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1, store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = CPZ2023iniw(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct);
+    YYforHF_struct = makeProbabilityIntervalsStruct(store_YY,fdatesHF,var_list);
+    YYforLF_struct = makeProbabilityIntervalsStruct(store_YY_LF,fdatesLF,var_list);
+    data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position of the low-frequency variable
+    forecast_flags_vec = .!data_flags_vec;                          # bit_vector showing the forecasted position. Only supports balanced z_tab #TODO: make it work for unbalanced z_tab
+    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, store_c1, store_c2, M_inter_agg, fdatesHF, fdatesLF, YYforLF_struct, YYforHF_struct,data_flags_vec,forecast_flags_vec);
     return out_struct
 end
 
@@ -49,7 +53,7 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
     fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, HF_n_fcst = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     fdatesHF = timestamp(fdataHF_tab);
     fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
-    M_inter_agg = BEAVARs.CPZ_makeM_inter_agg(fdatesLF,fdatesHF,freq_mix_tp);
+    M_inter_agg = BEAVARs.makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp);
 
     YYwNA   = values(fdataHF_tab);
 
@@ -64,7 +68,7 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
     nm      = sum(Sm_bit);          # the number of missing values
     longyo  = vYYt[vec(So_bit)];    # observed values, should not change ever
 
-    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.CPZ_makeM_inter(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
 
     Y0 = @views YY[1:p,:];     # this is just a view, so if we update YY, we update this
     if any(isnan.(Y0))
@@ -100,6 +104,8 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
     store_ρ = zeros(n_save,);
     store_σ_h2 = zeros(n_save,); 
     store_eh = zeros(T,n_save);
+    store_c1 = zeros(n_save,);
+    store_c2 = zeros(n_save,);
 
     for ii = 1:ndraws
         # updating pbsi_struct with Σt_inv.
@@ -141,7 +147,7 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
 
     end
     store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
-    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
+    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh, store_c1, store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
 end
 
 

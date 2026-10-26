@@ -6,8 +6,9 @@ Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Mac
 
 Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005)
 
+Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2013. Bayesian VARs: Specification Choices and Forecast Accuracy. _Journal of Applied Econometrics_ 30 (1): 46-73. https://doi.org/10.1002/jae.2315.
 
-Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2016. Common Drifting Volatility in Large Bayesian VARs. _Journal of Business & Economic Statistics_ 34 (3): 375–90. https://doi.org/10.1080/07350015.2015.1040116.
+Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2016. Common Drifting Volatility in Large Bayesian VARs. _Journal of Business & Economic Statistics_ 34 (3): 375–390. https://doi.org/10.1080/07350015.2015.1040116.
 
 
 # Function index

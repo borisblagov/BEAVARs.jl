@@ -333,21 +333,51 @@ nanfunc(f, A; dims=:) = _nanfunc(f, A, dims)
 @doc raw"""
     YY_low1, YY_low, YY_med, YY_hih, YY_hih1 = function get_imp_percentiles(YYmat_3d)
 
-    Calculate the 68% and 90% probability intervals that are important in macroeconomics
+    Calculate percentiles for constructing 68%, 90%, and 95% probability intervals that are important in macroeconomics.
+    Note that the 95% probabiltiy interval is made from [YY_low025 YY_hih975] and not [YY_low05 YY_low95]
 
     # Arguments:
         YYmat_3d: a 3-d array with the third dimension being the draws
 
-
     Developer note: Using AbstractArray allows your function to accept matrix views (SubArray) and outputs from reshape without forcing Julia to copy data in memory first. This is a  memory-saver when calculating percentiles across MCMC draws!
 """
 function get_imp_percentiles(YYmat_3d::AbstractArray{T,3}) where T <: AbstractFloat
-    YY_low2 = percentile_mat(YYmat_3d,0.025,dims=3);
-    YY_low1 = percentile_mat(YYmat_3d,0.05,dims=3);
-    YY_low = percentile_mat(YYmat_3d,0.16,dims=3);
+    YY_low025 = percentile_mat(YYmat_3d,0.025,dims=3);
+    YY_low05 = percentile_mat(YYmat_3d,0.05,dims=3);
+    YY_low16 = percentile_mat(YYmat_3d,0.16,dims=3);
     YY_med = percentile_mat(YYmat_3d,0.5,dims=3);
-    YY_hih = percentile_mat(YYmat_3d,0.84,dims=3);
-    YY_hih1 = percentile_mat(YYmat_3d,0.95,dims=3);
-    YY_hih2 = percentile_mat(YYmat_3d,0.975,dims=3);
-    return YY_low2, YY_low1, YY_low, YY_med, YY_hih, YY_hih1, YY_hih2
+    YY_hih84 = percentile_mat(YYmat_3d,0.84,dims=3);
+    YY_hih95 = percentile_mat(YYmat_3d,0.95,dims=3);
+    YY_hih975 = percentile_mat(YYmat_3d,0.975,dims=3);
+    return YY_low025, YY_low05, YY_low16, YY_med, YY_hih84, YY_hih95, YY_hih975
+end
+
+
+
+function int2strMF(freq_mix_tp)
+    if length(freq_mix_tp) == 3 # case for a two-frequency model, where the tuple has only three elements
+
+        # first element (high frequency)
+        if freq_mix_tp[1] == 1
+            tp1 = "Monthly"
+        elseif freq_mix_tp[1] == 3
+            tp1 = "Quarterly"
+        end
+
+        # second element (low frequency)
+        if freq_mix_tp[2] == 3
+            tp2 = "Quarterly"
+        elseif freq_mix_tp[2] == 12
+            tp2 = "Annual"
+        end
+
+        # third element (growth rates or levels)
+        if freq_mix_tp[3] == 0
+            tp3 = "Growth rates"
+        elseif freq_mix_tp[3] == 1
+            tp3 = "Levels"
+        end
+    end
+    freq_mix_label_tuple = (tp1,tp2,tp3)
+
 end

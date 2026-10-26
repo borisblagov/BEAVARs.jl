@@ -136,7 +136,7 @@ See also `makeDataSetup`.
 end
 
 
-# Structure to hold the median, 68% and 95% percentiles of the forecasts for a VAR
+# Structure to hold the median, 68% and 90% percentiles of the forecasts for a VAR
 @with_kw struct data_fcast_PI{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
     YYfor_low05_tab::TimeArray{T,N,D,A}         
     YYfor_low16_tab::TimeArray{T,N,D,A}         
@@ -145,6 +145,18 @@ end
     YYfor_hih95_tab::TimeArray{T,N,D,A}
 end
 
+# Structure to hold the median, 68%, 90%, and 95% percentiles of the forecasts for a VAR
+struct probability_intervals_struct{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    YYfor_low025_tab::TimeArray{T,N,D,A}         
+    YYfor_low05_tab::TimeArray{T,N,D,A}         
+    YYfor_low16_tab::TimeArray{T,N,D,A}         
+    YYfor_med_tab::TimeArray{T,N,D,A}         
+    YYfor_hih84_tab::TimeArray{T,N,D,A}
+    YYfor_hih95_tab::TimeArray{T,N,D,A}
+    YYfor_hih975_tab::TimeArray{T,N,D,A}
+end
+
+# main setup structure for a BEAVAR model
 @with_kw struct VARSetup <: BVARmodelSetup
     p::Int          # number of lags
     n_save::Int      # gibbs to save
@@ -166,6 +178,8 @@ end
 
 
 # types for forecast output export
+# this structure copies the things from store_YY. This is suboptimal for MF models because those are large matrices.
+# Should be depreciated
 @with_kw struct VAR_MF_Forecast <: BVARforecastOutput
     YforHF3d::Array{}          # 3D array with the high frequency forecasts. Dimensions are (p+n_fcst*) x n x n_save
     YforLF3d::Array{}          # 3D array with the low frequency forecasts. Dimensions are (p+n_fcst) x n x n_save
@@ -178,6 +192,9 @@ end
     data_flags_vec::BitVector              # bit vector showing the position of the data in low-frequency in the output. Only supports balanced z_tab 
     forecast_flags_vec::BitVector          # bit vector showing the position of the low-frequency forecasts in the output
 end
+
+
+
 
 
 @with_kw struct EvalForecast{T<:AbstractFloat,N} <: BVARmodelEval
@@ -266,8 +283,9 @@ end
 include("dataPrep.jl")
 include("init_functions.jl")
 include("gigrnd.jl")
-include("BGR2010.jl")
 include("irfs.jl")
+include("plot_functions.jl")
+include("mf_functions.jl")
 include("Chan2020base.jl")
 include("Chan2020new_funcs.jl")
 include("Chan2020minn.jl")
@@ -276,9 +294,8 @@ include("Chan2020csv.jl")
 include("CCK2016csv.jl")
 include("CPZ2023.jl")
 include("CPZ2023iniw.jl")
-include("Blagov2025.jl")
 include("Blagov2027.jl")
-include("plot_functions.jl")
+include("BGR2010.jl")
 
 
 #-------------------------------------
