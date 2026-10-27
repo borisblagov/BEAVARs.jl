@@ -41,6 +41,8 @@ abstract type BVARmodelSFType <: BVARmodelType end # a type cathing all single f
 abstract type BVARmodelSetup end        # type for VAR setup parameters
 abstract type BVARmodelHypSetup end     # types for hyperparameters
 abstract type BVARmodelDataSetup end    # types for storing the data unputs to the models
+abstract type BVARmodelDataSetup_MF <: BVARmodelDataSetup end # a type cathing all mixed frequency models
+abstract type BVARmodelDataSetup_MFcs <: BVARmodelDataSetup end # a type cathing all mixed frequency models
 abstract type BVARmodelLoopSetup end    # type for VAR setup parameters
 abstract type BVARmodelOutput end       # type for output storage
 abstract type BVARmodelEval end       # type for forecast evaluation storage
@@ -118,6 +120,21 @@ end
 
 # Structure for the datasets of a mixed-frequency BVAR
 @doc raw"""
+    data_MFVAR_crossSect()
+
+See also `makeDataSetup`.
+"""
+@with_kw struct data_MFVAR_crossSect{T <: AbstractFloat, D, N1, A1 <: AbstractArray{T, N1}, N2, A2 <: AbstractArray{T, N2}, N3, A3 <: AbstractArray{T, N3}, N4, A4 <: AbstractArray{T, N4}} <: BVARmodelDataSetup_MFcs
+    dataHF_tab::TimeArray{T,N1,D,A1}                                       # data for the high-frequency variables
+    dataLF_tab::TimeArray{T,N2,D,A2}                                       # data for the low-frequency variables
+    z_tabCS::TimeArray{T,N3,D,A3}                                          # observations for cross-sectional constraint
+    dataCS_tab::TimeArray{T,N4,D,A4}                                       # weights for the low-frequency variables that sum on each row to 1
+    var_list::Vector{Symbol}                                   # Symbol vector with the variable names, will be used for ordering
+end
+
+
+# Structure for the datasets of a mixed-frequency BVAR with cross-sectional restriction
+@doc raw"""
     data_MFVAR_2f(data_HF::TimeArray,data_LF::TimeArray,var_list::Array{Symbol,1})
 
 Generate a dataset strcture for use with CPZ2023 model
@@ -129,11 +146,12 @@ Generate a dataset strcture for use with CPZ2023 model
 
 See also `makeDataSetup`.
 """
-@with_kw struct data_MFVAR_2f{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
-    dataHF_tab::TimeArray{T,N,D,A}                                       # data for the high-frequency variables
-    dataLF_tab::TimeArray{T,N,D,A}                                       # data for the low-frequency variables
-    var_list::Array{Symbol,1}                                   # Symbol vector with the variable names, will be used for ordering
+@with_kw struct data_MFVAR_2f{T <: AbstractFloat, N1, D, A1 <: AbstractArray{T, N1}, N2, A2 <: AbstractArray{T, N2}} <: BVARmodelDataSetup_MF
+    dataHF_tab::TimeArray{T,N1,D,A1}                                       # data for the high-frequency variables
+    dataLF_tab::TimeArray{T,N2,D,A2}                                       # data for the low-frequency variables
+    var_list::Vector{Symbol}                                   # Symbol vector with the variable names, will be used for ordering
 end
+
 
 
 # Structure to hold the median, 68% and 90% percentiles of the forecasts for a VAR

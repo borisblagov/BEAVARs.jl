@@ -25,7 +25,7 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames = BEAVARs.init_MF_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
 
     YYwNA = values(fdataHF_tab);
     YY = deepcopy(YYwNA);
@@ -107,7 +107,7 @@ end
 
 
 @doc raw"""
-    CPZ_prep_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)
+    init_MF_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)
 
     Prepare one large table with the full dataset  `fataHF_tab` with both low and high-frequency variables with low-freq having `NaNs`. 
     It will extend the table with n_fcst, which is the amoung of *low frequency* time periods.
@@ -116,7 +116,7 @@ end
     e.g. [varNamesLF; varNamesHF] and not [varNamesLF, varNamesHF]
     prior_RW = 0: growth rates, 1: log-levels. indicator for the aggregate weights in the inter-temporal aggregation
 """
-function CPZ_prep_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)  where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
+function init_MF_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray{T,N,D,A},varOrder::Array{Symbol,1},prior_RW::Int,n_fcst::Int)  where {T <: AbstractFloat, N, D, A <: AbstractArray{T, N}}
     varNamesLF::Vector{Symbol} = Vector{Symbol}(colnames(dataLF_tab))
     z_tab::TimeArray{T,N,D,A} = dataLF_tab
 

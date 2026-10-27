@@ -10,7 +10,7 @@ data_struct = makeDataSetup(model_type,data)
 
 n_draws  = n_save+n_burn;
 
-
+YY = TimeSeries.values(data);
 Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_bb_struct, csv_Σt_struct, csv_h_struct = BEAVARs.init_Minn_csv(YY,set_struct,hyp_struct)
 vecYt = vec(Y')
 

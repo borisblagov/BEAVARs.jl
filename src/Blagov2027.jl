@@ -9,11 +9,31 @@ end
 #-------------------------------------
 
 @doc raw"""
-    Main function for Blagov2027
+    beavar(::Blagov2027_type, set_struct::BEAVARs.BVARmodelSetup, hyp_struct::BEAVARs.BVARmodelHypSetup, data_struct::BEAVARs.BVARmodelDataSetup_MF)
+
+    Main function for Blagov2027, which has only an intertemporal mixed-frequency constraint
 """
-function beavar(::Blagov2027_type, set_struct, hyp_struct, data_struct)
+function beavar(::Blagov2027_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup_MF)
     println("Hello Blagov2027")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = Blagov2027(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
+    YYforHF_struct = makeProbabilityIntervalsStruct(store_YY,fdatesHF,var_list);
+    YYforLF_struct = makeProbabilityIntervalsStruct(store_YY_LF,fdatesLF,var_list);
+    data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position of the low-frequency variable
+    forecast_flags_vec = .!data_flags_vec;                          # bit_vector showing the forecasted position. Only supports balanced z_tab #TODO: make it work for unbalanced z_tab
+    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h,store_ρ,store_σ_h2, store_eh, store_c1,store_c2, M_inter_agg, fdatesHF, fdatesLF, YYforLF_struct, YYforHF_struct,data_flags_vec,forecast_flags_vec);
+    return out_struct
+end
+
+
+@doc raw"""
+    beavar(::Blagov2027_type, set_struct::BEAVARs.BVARmodelSetup, hyp_struct::BEAVARs.BVARmodelHypSetup, data_struct::BEAVARs.BVARmodelDataSetup_MFcs)
+
+    Main function for Blagov2027 with cross-sectional restriction
+"""
+function beavar(::Blagov2027_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup_MFcs)
+    println("Hello Blagov2027")
+    @unpack dataHF_tab,dataLF_tab, z_tabCS, dataCS_tab, var_list = data_struct
     store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = Blagov2027(dataHF_tab,dataLF_tab,var_list,set_struct,hyp_struct)    
     YYforHF_struct = makeProbabilityIntervalsStruct(store_YY,fdatesHF,var_list);
     YYforLF_struct = makeProbabilityIntervalsStruct(store_YY_LF,fdatesLF,var_list);
@@ -27,14 +47,13 @@ end
 # # Structure for the datasets and the frequency mix
 # @doc raw"""
 #     dataBlagov2027(data_HF::TimeArray,data_LF::TimeArray,prior_RW::Int,var_list::Array{Symbol,1})
-
+#
 # generate a dataset strcture for use with Blagov2027 model
-
 # # Arguments
 #     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
 #     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
 #     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
-
+#
 # See also `makeDataSetup`.
 # """
 # @with_kw struct dataBlagov2027{Ttyp <: AbstractFloat, Ntyp, Dtyp, Atyp <: AbstractArray{Ttyp, Ntyp}} <: BVARmodelDataSetup
@@ -49,6 +68,14 @@ end
 function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
     return data_MFVAR_2f(dataHF_tab, dataLF_tab, var_list)
 end
+
+
+function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_tabCS::TimeArray, dataCS_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_tabCS, dataCS_tab, var_list)
+end
+
+
+
 
 
 
@@ -82,11 +109,12 @@ Implements the mixed-frequency BVAR model as in Blagov et al. (2025)
 The function implements the mixed-frequency BVAR model as in Blagov et al. (2027).
 """
 function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},varOrder::Array{Symbol,1},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup) where {Typ <: AbstractFloat, Ntyp, Dtyp, Atyp <: AbstractArray{Typ, Ntyp}}
+
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp, show_prog = set_struct
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, n_fcst_hf = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, n_fcst_hf = BEAVARs.init_MF_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     fdatesHF = timestamp(fdataHF_tab);
     fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
     M_inter_agg = BEAVARs.makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp);
@@ -104,17 +132,8 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     nm      = sum(Sm_bit);          # the number of missing values
     longyo  = vYYt[vec(So_bit)];    # observed values, should not change ever
 
-    M_inter, z_inter_vec, T_z_inter, O_inter = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    M_z, z_vec, T_z, O_z = BEAVARs.makeM_intertemp(z_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf);
     
-
-    M_z = M_inter;
-    z_vec = z_inter_vec;
-    T_z = T_z_inter;
-    O_z = zeros(T_z,T_z); 
-    O_z[1:T_z_inter,1:T_z_inter] = O_inter; 
-    # O_z[T_z_inter+1:T_z_inter+T_z_cs,T_z_inter+1:T_z_inter+T_z_cs] = O_cs; 
-
-
     MOiM = M_z'*(O_z\M_z);
     MOiz = M_z'*(O_z\z_vec);
 
@@ -424,7 +443,7 @@ end
 """
 function makeProbabilityIntervalsStruct(YYforLF3d,fdatesLF,var_list)
 
-    YY_low025, YY_low05, YY_low16, YforLF_med, YY_hih84, YY_hih95, YY_hih975 = get_imp_percentiles(YYforLF3d) 
+    YY_low025, YY_low05, YY_low16, YforLF_med, YY_hih84, YY_hih95, YY_hih975 = get_imp_percentiles_llm(YYforLF3d) 
 
     YY_low025_tab = rename!(TimeArray(fdatesLF,YY_low025),var_list);
     YY_low05_tab = rename!(TimeArray(fdatesLF,YY_low05),var_list);

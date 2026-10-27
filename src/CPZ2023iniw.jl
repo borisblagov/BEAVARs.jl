@@ -50,7 +50,7 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
     ndraws = n_save+n_burn;
     nmdraws = 10;               # given a draw from the parameters to draw multiple time from the distribution of the missing data for better confidence intervals
 
-    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, HF_n_fcst = BEAVARs.CPZ_prep_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
+    fdataHF_tab, z_tab, freq_mix_tp, datesHF, varNamesLF, fvarNames, HF_n_fcst = BEAVARs.init_MF_TimeArrays(dataLF_tab,dataHF_tab,varOrder,prior_RW,n_fcst)
     fdatesHF = timestamp(fdataHF_tab);
     fdatesLF = collect(timestamp(z_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
     M_inter_agg = BEAVARs.makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp);
@@ -68,7 +68,10 @@ function CPZ2023iniw(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,
     nm      = sum(Sm_bit);          # the number of missing values
     longyo  = vYYt[vec(So_bit)];    # observed values, should not change ever
 
-    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    M_zsp, z_vec, T_z, O_z = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    
+    MOiM = M_zsp'*(O_z\M_zsp);
+    MOiz = M_zsp'*(O_z\z_vec);
 
     Y0 = @views YY[1:p,:];     # this is just a view, so if we update YY, we update this
     if any(isnan.(Y0))

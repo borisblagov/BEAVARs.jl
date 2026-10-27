@@ -1,5 +1,7 @@
 [deps]
 BEAVARs = "93a03eec-7b33-4fd3-aded-846a82f4850b"
+BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"

@@ -23,7 +23,8 @@ Generates an M matrix such that `z = My + eps`. `y` is a vector of unobserved hi
 
 # TODO: add support for z_tab variables with various lengths
 """
-function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf;scVal=10e-8)
+function makeM_intertemp(z_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf;scVal=10e-8)
+    nm = sum(Sm_bit);
     z_var_pos  = indexin(varNamesLF,fvarNames); # positions of the variables in z
     if length(size(z_tab)) == 1
         T_z = size(z_tab,1)
@@ -33,7 +34,7 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
     end
     M_z = zeros(T_z*n_z,nm)
     z_vec = zeros(T_z*n_z,)
-    iter = CartesianIndices(YYt)
+    iter = CartesianIndices(Sm_bit)
     flagFirstRow = falses(n_z);                              # if we don't have a full quarter/year we will not be able to have a hard constraint in the beginning, set the error to a higher value
 
     for ii_z = 1:n_z # iterator going through each variable in z_tab (along the columns)
@@ -105,8 +106,48 @@ end
 
 
 @doc raw"""
-    makeM_crossSect()
+    makeM_crossSect(z_tabCS, var_listLF, dataCS_tab, fdataHF_tab, Sm_bit,
+                    prior_RW, nm; scVal=10e-8)
+              
+    Construct the mapping matrix for a cross-sectional constraint on missing
+    high-frequency observations. 
+    
+    Given observations $z$, and a weighting matrix weightsCS_tab the the function returns
+        $z = M_cs * y^m$
+    for a vector of missing data $y^m$. 
+        
+    It matches the entries in $z$ with the entries in  $y^m$ using dates in dataCS_tab.
 
+    The constraint series must contain exactly one variable. The dates in
+    `z_tabCS` must be present in the weight table.
+
+# Arguments
+    - `z_tabCS`: A one-column `TimeArray` containing the cross-sectional
+    constraint observations.
+    - `var_listLF`: Names of the high-frequency variables included in the
+    constraint. These names select and order the columns from `dataCS_tab`.
+    - `dataCS_tab`: A `TimeArray` of cross-sectional weights, indexed by date and
+    variable.
+    - `fdataHF_tab`: The high-frequency data `TimeArray`; its dates and column
+    names are used to map variables and observations.
+    - `Sm_bit`: Boolean mask identifying missing high-frequency observations in the full dataset.
+    Its shape and ordering should correspond to the complete datset in its high-frequency format.
+    - `prior_RW`: 0: Whether the data in the MF-VAR is in growth rates or in log-levels
+    - `nm`: Number of missing observations in the y^m vector, the sum of `Sm_bit`.
+    - `scVal`: Diagonal value used to initialize the constraint error matrix
+    `O_z_cs`. Defaults to `10e-8`.
+
+# Returns
+    A tuple `(M_cs, z_cs_vec, T_z_cs, O_z_cs)`:
+    - `M_cs`: Constraint matrix, with one row per missing observation.
+    - `z_cs_vec`: The observed values that are some function of the missing data.
+    - `T_z_cs`: Number of constraint rows.
+    - `O_z_cs`: Diagonal constraint error matrix.
+
+# Errors
+    Throws an error if `z_tabCS` has more than one column, the number of missing
+    entries in `Sm_bit` does not equal `nm`, or a constraint date is missing from
+    the weight table.
 """
 function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_RW,nm;scVal=10e-8)
     if size(z_tabCS,2) ≠ 1

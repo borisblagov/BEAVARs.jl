@@ -341,7 +341,7 @@ nanfunc(f, A; dims=:) = _nanfunc(f, A, dims)
 
     Developer note: Using AbstractArray allows your function to accept matrix views (SubArray) and outputs from reshape without forcing Julia to copy data in memory first. This is a  memory-saver when calculating percentiles across MCMC draws!
 """
-function get_imp_percentiles(YYmat_3d::AbstractArray{T,3}) where T <: AbstractFloat
+function get_imp_percentiles(YYmat_3d::AbstractArray{T,3}) where {T <: AbstractFloat}
     YY_low025 = percentile_mat(YYmat_3d,0.025,dims=3);
     YY_low05 = percentile_mat(YYmat_3d,0.05,dims=3);
     YY_low16 = percentile_mat(YYmat_3d,0.16,dims=3);
@@ -352,6 +352,38 @@ function get_imp_percentiles(YYmat_3d::AbstractArray{T,3}) where T <: AbstractFl
     return YY_low025, YY_low05, YY_low16, YY_med, YY_hih84, YY_hih95, YY_hih975
 end
 
+
+"""
+    get_imp_percentiles_llm(YYmat_3d::AbstractArray{T,3}) where {T<:AbstractFloat}
+
+    Alternative function to get_imp_percentiles, which is type stable.
+
+    Written by llm and there is a test in the testsuite that checks the output versus get_imp_percentiles()
+
+    See also get_imp_percentiles()
+"""
+function get_imp_percentiles_llm(YYmat_3d::AbstractArray{T,3}) where {T<:AbstractFloat}
+    function percentile_over_draws(p)
+        result = Matrix{T}(undef, size(YYmat_3d, 1), size(YYmat_3d, 2))
+
+        for (j_out, j) in enumerate(axes(YYmat_3d, 2)),
+            (i_out, i) in enumerate(axes(YYmat_3d, 1))
+            result[i_out, j_out] = quantile(view(YYmat_3d, i, j, :), p)
+        end
+
+        return result
+    end
+
+    return (
+        percentile_over_draws(0.025),
+        percentile_over_draws(0.05),
+        percentile_over_draws(0.16),
+        percentile_over_draws(0.5),
+        percentile_over_draws(0.84),
+        percentile_over_draws(0.95),
+        percentile_over_draws(0.975),
+    )
+end
 
 
 function int2strMF(freq_mix_tp)
