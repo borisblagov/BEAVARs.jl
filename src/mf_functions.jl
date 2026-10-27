@@ -29,13 +29,13 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         T_z = size(z_tab,1)
         n_z = 1
     else
-        T_z, n_z = size(z_tab);  # TODO this currently supports only a balanced panel of low frequency observed variables. E.g. you cannot have GDP but not have consumption
+        T_z, n_z = size(z_tab);  # TODO this currently supports only a balanced panel of low frequency observed variables. E.g. you cannot have more obs. in GDP but not in consumption if you have both as low-frequency variables
     end
     M_z = zeros(T_z*n_z,nm)
     z_vec = zeros(T_z*n_z,)
     iter = CartesianIndices(YYt)
-    flagFirstRow = zeros(n_z,);                              # if we don't have a full quarter/year we will not be able to have a hard constraint in the beginning, set the error to a higher value
-    
+    flagFirstRow = falses(n_z);                              # if we don't have a full quarter/year we will not be able to have a hard constraint in the beginning, set the error to a higher value
+
     for ii_z = 1:n_z # iterator going through each variable in z_tab (along the columns)
         
         datesLF_ii = timestamp(z_tab[varNamesLF[ii_z]])
@@ -45,11 +45,11 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         z_Mind_vec_ii = vec(sum(ym_ci.==z_ci,dims=2))       # alternative z_Mind_vec=vec(indexin(ym_ci,z_ci)).!==nothing
         M_inter_ii = zeros(T_z,nm)
         M_z_ii = @views M_inter_ii[:,z_Mind_vec_ii.==1]
-    
+
         if size(datesHF,1)!==size(M_z_ii,2)
             # error("The size of M does not match the number of dates available in z_tab. Maybe the low-frequency data is longer? The problem is with variable number ", z_var_pos[ii_z])
         end
-    
+
         # we need to watch out with the dates due to how the intertemporal constraint works Take for example growth rates Q and M
         # y_t = 1/3 y_t - 2/3 y_{t-1} \dots - - 2/3 y_{t-3} - 1/3 y_{t-5}
         # Intuitively, Q1 quarterly GDP (e.g. 01.01.2000) is the weighted sum of the monthly March, February, January, December, November, and October
@@ -73,14 +73,14 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         else
             error("This combination of frequencies and transformation has not been implemented")
         end
-    
+
         for ii_zi in eachindex(datesLF_ii) # iterator going through each time point in datesHF
             if ii_zi == 1 # check if we have a full quarter/year in the beginning, otherwise we will try to acces negative indices in the matrix M
                 ii_M = findall(datesHF.==datesLF_ii[ii_zi])[1]       # find the low-frequency index that corresponds to the high-frequency missing value
                 MrowRange = ii_M-div((n_hfw-hf_num1),2): ii_M+div((n_hfw-hf_num2),2);
                 start_value = max(1, MrowRange[1]); stop_value = MrowRange[end]; positive_range = start_value:stop_value
                 M_z_ii[ii_zi,start_value:stop_value]=hfWeights[MrowRange.>0];
-                flagFirstRow[ii_z] = 1;
+                flagFirstRow[ii_z] = true;
             else
                 ii_M = findall(datesHF.==datesLF_ii[ii_zi])[1]       # find the low-frequency index that corresponds to the high-frequency missing value
                 # M_z_ii[ii_zi, findall(datesHF.==datesLF_ii[ii_zi])[1]-n_hfw+1:findall(datesHF.==datesLF_ii[ii_zi])[1]] = hfWeights # if shifted above
@@ -90,83 +90,109 @@ function makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_
         M_z[(ii_z-1)*T_z + 1:T_z + (ii_z-1)*T_z,:] = M_inter_ii;    # , should be fixed by stacking the M_inter_ii
         z_vec[(ii_z-1)*T_z + 1:T_z + (ii_z-1)*T_z,]  = values(z_tab[varNamesLF[ii_z]]);
     end
-    # M_zsp = M_z;                        # Leftover from when trying sparse matrices, should be fixed by stacking the M_inter_ii
-    O_zsp = Matrix(I,T_z*n_z,T_z*n_z).*scVal;   # this works only if we have one z variable (with T_z length)
+
+    O_z_int = Matrix(I,T_z*n_z,T_z*n_z).*scVal;   # this works only if we have one z variable (with T_z length)
     for ii = 1:n_z
-        if flagFirstRow[ii] == 1             
-            O_zsp[1+(ii-1)*T_z,1+(ii-1)*T_z] = scVal*1000   # add a higher value to the error for the first observation if we don't have a full quarter/year in the beginning, as we will not be able to have a hard constraint in the beginning
+        if flagFirstRow[ii] == true             
+            O_z_int[1+(ii-1)*T_z,1+(ii-1)*T_z] = scVal*1000   # add a higher value to the error for the first observation if we don't have a full quarter/year in the beginning, as we will not be able to have a hard constraint in the beginning
         end
     end
-    MOiM = M_z'*(O_zsp\M_z);
-    MOiz = M_z'*(O_zsp\z_vec);
-    return M_z, z_vec, T_z, MOiM, MOiz
+
+    T_z_inter = T_z*n_z;
+
+    return M_z, z_vec, T_z_inter, O_z_int
 end
 
 
 @doc raw"""
-    makeM_crosssect(csWeights_timetab,idx_mat,varNamesLF,missingTab_in,zTab_in,Nm)
+    makeM_crossSect()
 
-Builds a cross-sectional mapping matrix `M` such that `z = M*y_M`, where each
-row combines missing high-frequency variables using the date-specific weights
-in `csWeights_timetab`.
-
-# Arguments
-    csWeights_timetab: A `TimeArray` of cross-sectional weights, indexed by date
-    idx_mat:            A `T_z × length(varNamesLF)` matrix of 1-based positions
-                        into the missing-value vector `y_M`
-    varNamesLF:         Weight-column names, in the same order as the columns of
-                        `idx_mat`
-    missingTab_in:      A `TimeArray` identifying the dates and variables in `y_M`
-    zTab_in:            A `TimeArray` containing the constrained observations
-    Nm:                 Length of the missing-value vector `y_M`
-
-`idx_mat` rows must correspond to the dates in `zTab_in` and `missingTab_in`.
-When the weight table has one row, its weights are reused for every date;
-otherwise, it must contain every date in `missingTab_in`.
-
-Returns `(M, z, T_z)`, where `z` contains the values of `zTab_in`.
 """
-function makeM_crosssect(csWeights_timetab,idx_mat::AbstractMatrix{<:Integer},varNamesLF,missingTab_in,zTab_in,Nm)
-    T_z = size(zTab_in,1)
-    nLF = length(varNamesLF)
-    z_dates = timestamp(zTab_in)
-    missing_dates = timestamp(missingTab_in)
-    weight_dates = timestamp(csWeights_timetab)
-    weight_names = colnames(csWeights_timetab)
-
-    size(idx_mat) == (T_z,nLF) ||
-        throw(DimensionMismatch("idx_mat must have size ($T_z, $nLF), got $(size(idx_mat))"))
-    size(missingTab_in,1) == T_z ||
-        throw(DimensionMismatch("missingTab_in must have $T_z rows, got $(size(missingTab_in,1))"))
-    missing_dates == z_dates ||
-        throw(ArgumentError("zTab_in and missingTab_in must contain the same dates in the same order"))
-    Nm >= 0 || throw(ArgumentError("Nm must be nonnegative"))
-    all(name -> name in weight_names,varNamesLF) ||
-        throw(ArgumentError("Every name in varNamesLF must be a column in csWeights_timetab"))
-    all(index -> 1 <= index <= Nm,idx_mat) ||
-        throw(ArgumentError("Every index in idx_mat must be between 1 and Nm"))
-
-    weight_rows = if length(weight_dates) == 1
-        ones(Int,T_z)
-    else
-        weight_row_by_date = Dict(date => row for (row,date) in enumerate(weight_dates))
-        missing_weight_dates = filter(date -> !haskey(weight_row_by_date,date),missing_dates)
-        isempty(missing_weight_dates) ||
-            throw(ArgumentError("csWeights_timetab is missing weights for dates: $(missing_weight_dates)"))
-        [weight_row_by_date[date] for date in missing_dates]
-    end
-    weight_values = values(csWeights_timetab[Symbol.(varNamesLF)])
-    if ndims(weight_values) == 1
-        weight_values = reshape(weight_values,:,1)
+function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_RW,nm;scVal=10e-8)
+    if size(z_tabCS,2) ≠ 1
+        error("z_tabCS should have only one variable in it. If you want multiple variabels consider adding another constraint")
     end
 
-    M_out = zeros(Float64,T_z,Nm)
-    for ii in 1:T_z
-        M_out[ii,idx_mat[ii,:]] .= weight_values[weight_rows[ii],:]
+    YY_dates    = TimeSeries.timestamp(fdataHF_tab);
+    fvarNames   = TimeSeries.colnames(fdataHF_tab);
+    weightsCS_tab = dataCS_tab[var_listLF];         # weighting matrix ordered by the order in fdataHF_tab. Should contain the variable to be constraint
+    weights_dates = TimeSeries.timestamp(weightsCS_tab);
+    varNamesCS  = var_listLF                        # variable names of the unobserved variables that will be constrained
+    T_z_cs      = size(z_tabCS,1)                   # Observations of the cross-sectional constraint
+    n_cs_var    = size(weightsCS_tab,2)             # number of variables in the HF to be constrained
+    z_dates     = TimeSeries.timestamp(z_tabCS);
+
+    z_varCS_pos  = indexin(varNamesCS,fvarNames);   # positions of the variables in YYt and correspondingly in Sm_bit
+    iter = CartesianIndices(Sm_bit)
+    ym_ci_all = iter[Sm_bit]                        # The full vector of y^m, should be nm × 1
+    if length(ym_ci_all) ≠ nm
+        error("The length of the y^m vector does not correspond to the missing values in Sm_bit")
     end
 
-    z_out = values(zTab_in)
-    return M_out,z_out,T_z
+    if issubset(Set(z_dates), Set(weights_dates)) ≠ true
+        error("All weight entries in the supplied z_tabCS must be present in the weights table to properly assign weights to them.")
+    end
+    ym_rownum= getindex.(ym_ci_all, 1);             # all row numbers of the missing entries in y^m. Every row, that correspond to the variables in z_posCS is one that we need
+    ym_colnum= getindex.(ym_ci_all, 2);             # all row numbers of the missing entries in y^m. Every row, that correspond to the variables in z_posCS is one that we need
+    ym_dates = YY_dates[ym_colnum]                  # The vector of dates that correspond to each missing observation
+
+
+    # initialize M_cs
+    M_cs = zeros(T_z_cs,nm);                        # initialize M_cs
+    O_z_cs = diagm(ones(T_z_cs).*scVal);             # initialize the error matrix
+    
+    if prior_RW == 0
+        ## Intertemporal constraints with variables in log-growth rates
+
+        # we now want to loop over each entry of the date in z_tabCS and then fix that year to the cartesian indices of the unobserved variables
+        for it_z = 1:T_z_cs
+            it_z_date = TimeSeries.timestamp(z_tabCS[it_z])[1]
+
+            bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
+            for io = 2:n_cs_var
+                bit_io = ym_rownum.==z_varCS_pos[io]
+                bit_rownum .= bit_rownum .| bit_io
+            end
+            bit_colnum_it_z = ym_dates.==it_z_date;
+            idx_it_z = bit_rownum .& bit_colnum_it_z;       # a bit_vector specifying which position in y^m correspond to the entries of it_z
+
+            M_cs[it_z,idx_it_z] = @view values(weightsCS_tab[weights_dates.==it_z_date])[:]
+        end
+
+        z_cs_vec = TimeSeries.values(z_tabCS)
+
+    elseif prior_RW == 1
+        ## Intertemporal constraints with variables in log-levels. Note that we lose one observation
+
+        # we now want to loop over each entry of the date in z_tabCS and then fix that year to the cartesian indices of the unobserved variables
+        for it_z = 2:T_z_cs
+            itm1_z_date = TimeSeries.timestamp(z_tabCS[it_z-1])[1]
+            it_z_date = TimeSeries.timestamp(z_tabCS[it_z])[1]
+
+
+            bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
+            for io = 2:n_cs_var
+                bit_io = ym_rownum.==z_varCS_pos[io]
+                bit_rownum .= bit_rownum .| bit_io
+            end
+            bit_colnum_itm1_z = ym_dates.==itm1_z_date;     # the minus iz_t-1 position
+            bit_colnum_it_z = ym_dates.==it_z_date;         # the iz_t position
+            idx_itm1_z = bit_rownum .& bit_colnum_itm1_z;   # a bit_vector specifying which position in y^m correspond to the entries of it_z
+            idx_it_z = bit_rownum .& bit_colnum_it_z;       # a bit_vector specifying which position in y^m correspond to the entries of it_z
+            
+            M_cs[it_z,idx_it_z] = @view values(weightsCS_tab[weight_dates.==it_z_date])[:]
+            M_cs[it_z,idx_itm1_z] = -values(weightsCS_tab[weight_dates.==it_z_date])[:]
+        end
+        
+        # drop now the first rows
+        M_cs = M_cs[2:end,:]
+        z_cs_vec = z_cs_vec[2:end,]
+        T_z_cs = T_z_cs-1;
+        O_z_cs = O_z_cs[2:end,2:end]
+    end
+
+
+    return M_cs, z_cs_vec,T_z_cs, O_z_cs
 end
 
 

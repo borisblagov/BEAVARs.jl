@@ -104,7 +104,19 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     nm      = sum(Sm_bit);          # the number of missing values
     longyo  = vYYt[vec(So_bit)];    # observed values, should not change ever
 
-    M_zsp, z_vec, T_z, MOiM, MOiz = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    M_inter, z_inter_vec, T_z_inter, O_inter = BEAVARs.makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf);
+    
+
+    M_z = M_inter;
+    z_vec = z_inter_vec;
+    T_z = T_z_inter;
+    O_z = zeros(T_z,T_z); 
+    O_z[1:T_z_inter,1:T_z_inter] = O_inter; 
+    # O_z[T_z_inter+1:T_z_inter+T_z_cs,T_z_inter+1:T_z_inter+T_z_cs] = O_cs; 
+
+
+    MOiM = M_z'*(O_z\M_z);
+    MOiz = M_z'*(O_z\z_vec);
 
     Y0 = @views YY[1:p,:];     # this is just a view, so if we update YY, we update this
     if any(isnan.(Y0))
@@ -208,7 +220,7 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
         end
     end
     store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
-    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
+    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_z, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
 
 end
 
