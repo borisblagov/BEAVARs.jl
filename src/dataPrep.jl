@@ -473,3 +473,47 @@ function pred_lik_CCM(forecast_i_vec,true_data_i_vec)
     pred_lik_vec=-0.5.*((true_data_i_vec - dropdims(mean(forecast_i_vec,dims=3),dims=3)).^2 ./ V_i_tph .+ log.(V_i_tph) .+ log.(2*π))
     return pred_lik_vec
 end
+
+function write_timearrays_to_excel(qdata::TimeArray, ydata::TimeArray, filename::String)
+    XLSX.openxlsx(filename, mode="w") do xf
+        # ===== Qdata sheet =====
+        sheet1 = xf[1]
+        XLSX.rename!(sheet1, "Qdata")
+
+        q_names = colnames(qdata)
+        n_vars = length(q_names)
+
+        # Column headers
+        sheet1[1, 1] = "Timestamp"
+        for (i, name) in enumerate(q_names)
+            sheet1[1, i+1] = string(name)  # <-- Convert Symbol to String
+        end
+
+        # Write data rows
+        vals_q = values(qdata)
+        for (i, ts) in enumerate(timestamp(qdata))
+            sheet1[i+1, 1] = ts
+            for j in 1:n_vars
+                sheet1[i+1, j+1] = vals_q[i, j]
+            end
+        end
+
+        # ===== Ydata sheet =====
+        sheet2 = XLSX.addsheet!(xf, "Ydata")
+        y_names = colnames(ydata)
+        n_vars_y = length(y_names)
+
+        sheet2[1, 1] = "Timestamp"
+        for (i, name) in enumerate(y_names)
+            sheet2[1, i+1] = string(name)  # <-- Convert Symbol to String
+        end
+
+        vals_y = values(ydata)
+        for (i, ts) in enumerate(timestamp(ydata))
+            sheet2[i+1, 1] = ts
+            for j in 1:n_vars_y
+                sheet2[i+1, j+1] = vals_y[i, j]
+            end
+        end
+    end
+end

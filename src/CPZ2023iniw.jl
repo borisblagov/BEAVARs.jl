@@ -5,7 +5,8 @@
 @doc raw"""
     beavar(::CPZ2023iniw_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
 
-
+    A mixed-frequency VAR model based on the precision-based sampler in Chan, Poon, and Zhu (2023) with homoskedastic 
+    independent Normal inverse-Wishart variance-covariance matrix.
 """
 function beavar(::CPZ2023iniw_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello CPZ2023iniw")

@@ -10,10 +10,10 @@
 @doc raw"""
     beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
 
-    Estimates a BVAR with common stochastic volatility as proposed by Carriero, Clark, and Marcellino (2016). 
+    Estimates a BVAR with homoskedastic independent normal inverse Wishart variance-covariance matrix 
+    and a Minnesota prior based on the SUR formulation. 
 
-    The implementation of csv follows Chan (2020) and draws `h`, the stochastic volatility, using a Newton Rapson method and not the CCK article with Shephard and Chib's 1998 method.
-
+    
 """
 function beavar(::Chan2020iniw_type, set_struct, hyp_str, data_struct)
     println("Hello Independent Normal Inverse Wishart")

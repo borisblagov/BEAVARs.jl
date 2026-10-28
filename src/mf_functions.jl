@@ -2,7 +2,7 @@
 
 
 @doc raw"""
-    makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf;scVal=10e-8)
+    makeM_intertemp(z_tab,YYt,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,nm,Tf;scVal=10e-7)
 
 Generates an M matrix such that `z = My + eps`. `y` is a vector of unobserved high-frequency values and the observations in `z` relate by a linear combination to a subset of the values in `y`
 
@@ -23,7 +23,7 @@ Generates an M matrix such that `z = My + eps`. `y` is a vector of unobserved hi
 
 # TODO: add support for z_tab variables with various lengths
 """
-function makeM_intertemp(z_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf;scVal=10e-8)
+function makeM_intertemp(z_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf;scVal=10e-7)
     nm = sum(Sm_bit);
     z_var_pos  = indexin(varNamesLF,fvarNames); # positions of the variables in z
     if length(size(z_tab)) == 1
@@ -106,27 +106,27 @@ end
 
 
 @doc raw"""
-    makeM_crossSect(z_tabCS, var_listLF, dataCS_tab, fdataHF_tab, Sm_bit,
+    makeM_crossSect(z_cs_tab, var_listLF, dataw_cs_tab, fdataHF_tab, Sm_bit,
                     prior_RW, nm; scVal=10e-8)
               
     Construct the mapping matrix for a cross-sectional constraint on missing
-    high-frequency observations. 
+    high-frequency observations conditining on additional (exogenous) information. 
     
     Given observations $z$, and a weighting matrix weightsCS_tab the the function returns
         $z = M_cs * y^m$
     for a vector of missing data $y^m$. 
         
-    It matches the entries in $z$ with the entries in  $y^m$ using dates in dataCS_tab.
+    It matches the entries in $z$ with the entries in  $y^m$ using dates in dataw_cs_tab.
 
     The constraint series must contain exactly one variable. The dates in
-    `z_tabCS` must be present in the weight table.
+    `z_cs_tab` must be present in the weight table.
 
 # Arguments
-    - `z_tabCS`: A one-column `TimeArray` containing the cross-sectional
+    - `z_cs_tab`: A one-column `TimeArray` containing the cross-sectional
     constraint observations.
     - `var_listLF`: Names of the high-frequency variables included in the
-    constraint. These names select and order the columns from `dataCS_tab`.
-    - `dataCS_tab`: A `TimeArray` of cross-sectional weights, indexed by date and
+    constraint. These names select and order the columns from `dataw_cs_tab`.
+    - `dataw_cs_tab`: A `TimeArray` of cross-sectional weights, indexed by date and
     variable.
     - `fdataHF_tab`: The high-frequency data `TimeArray`; its dates and column
     names are used to map variables and observations.
@@ -134,7 +134,7 @@ end
     Its shape and ordering should correspond to the complete datset in its high-frequency format.
     - `prior_RW`: 0: Whether the data in the MF-VAR is in growth rates or in log-levels
     - `nm`: Number of missing observations in the y^m vector, the sum of `Sm_bit`.
-    - `scVal`: Diagonal value used to initialize the constraint error matrix
+    - `cs_scVal`: Diagonal value used to initialize the constraint error matrix
     `O_z_cs`. Defaults to `10e-8`.
 
 # Returns
@@ -145,23 +145,23 @@ end
     - `O_z_cs`: Diagonal constraint error matrix.
 
 # Errors
-    Throws an error if `z_tabCS` has more than one column, the number of missing
+    Throws an error if `z_cs_tab` has more than one column, the number of missing
     entries in `Sm_bit` does not equal `nm`, or a constraint date is missing from
     the weight table.
 """
-function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_RW,nm;scVal=10e-8)
-    if size(z_tabCS,2) ≠ 1
-        error("z_tabCS should have only one variable in it. If you want multiple variabels consider adding another constraint")
+function makeM_crossSect(z_cs_tab,var_listLF,dataw_cs_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal)
+    if size(z_cs_tab,2) ≠ 1
+        error("z_cs_tab should have only one variable in it. If you want multiple variabels consider adding another constraint")
     end
 
     YY_dates    = TimeSeries.timestamp(fdataHF_tab);
     fvarNames   = TimeSeries.colnames(fdataHF_tab);
-    weightsCS_tab = dataCS_tab[var_listLF];         # weighting matrix ordered by the order in fdataHF_tab. Should contain the variable to be constraint
+    weightsCS_tab = dataw_cs_tab[var_listLF];         # weighting matrix ordered by the order in fdataHF_tab. Should contain the variable to be constraint
     weights_dates = TimeSeries.timestamp(weightsCS_tab);
     varNamesCS  = var_listLF                        # variable names of the unobserved variables that will be constrained
-    T_z_cs      = size(z_tabCS,1)                   # Observations of the cross-sectional constraint
+    T_z_cs      = size(z_cs_tab,1)                   # Observations of the cross-sectional constraint
     n_cs_var    = size(weightsCS_tab,2)             # number of variables in the HF to be constrained
-    z_dates     = TimeSeries.timestamp(z_tabCS);
+    z_dates     = TimeSeries.timestamp(z_cs_tab);
 
     z_varCS_pos  = indexin(varNamesCS,fvarNames);   # positions of the variables in YYt and correspondingly in Sm_bit
     iter = CartesianIndices(Sm_bit)
@@ -171,7 +171,7 @@ function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_
     end
 
     if issubset(Set(z_dates), Set(weights_dates)) ≠ true
-        error("All weight entries in the supplied z_tabCS must be present in the weights table to properly assign weights to them.")
+        error("All weight entries in the supplied z_cs_tab must be present in the weights table to properly assign weights to them.")
     end
     ym_rownum= getindex.(ym_ci_all, 1);             # all row numbers of the missing entries in y^m. Every row, that correspond to the variables in z_posCS is one that we need
     ym_colnum= getindex.(ym_ci_all, 2);             # all row numbers of the missing entries in y^m. Every row, that correspond to the variables in z_posCS is one that we need
@@ -180,14 +180,15 @@ function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_
 
     # initialize M_cs
     M_cs = zeros(T_z_cs,nm);                        # initialize M_cs
-    O_z_cs = diagm(ones(T_z_cs).*scVal);             # initialize the error matrix
+    O_z_cs = diagm(ones(T_z_cs).*cs_scVal);             # initialize the error matrix
+    z_cs_vec = TimeSeries.values(z_cs_tab)[:]
     
     if prior_RW == 0
         ## Intertemporal constraints with variables in log-growth rates
 
-        # we now want to loop over each entry of the date in z_tabCS and then fix that year to the cartesian indices of the unobserved variables
+        # we now want to loop over each entry of the date in z_cs_tab and then fix that year to the cartesian indices of the unobserved variables
         for it_z = 1:T_z_cs
-            it_z_date = TimeSeries.timestamp(z_tabCS[it_z])[1]
+            it_z_date = TimeSeries.timestamp(z_cs_tab[it_z])[1]
 
             bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
             for io = 2:n_cs_var
@@ -200,15 +201,14 @@ function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_
             M_cs[it_z,idx_it_z] = @view values(weightsCS_tab[weights_dates.==it_z_date])[:]
         end
 
-        z_cs_vec = TimeSeries.values(z_tabCS)
 
     elseif prior_RW == 1
         ## Intertemporal constraints with variables in log-levels. Note that we lose one observation
 
-        # we now want to loop over each entry of the date in z_tabCS and then fix that year to the cartesian indices of the unobserved variables
+        # we now want to loop over each entry of the date in z_cs_tab and then fix that year to the cartesian indices of the unobserved variables
         for it_z = 2:T_z_cs
-            itm1_z_date = TimeSeries.timestamp(z_tabCS[it_z-1])[1]
-            it_z_date = TimeSeries.timestamp(z_tabCS[it_z])[1]
+            itm1_z_date = TimeSeries.timestamp(z_cs_tab[it_z-1])[1]
+            it_z_date = TimeSeries.timestamp(z_cs_tab[it_z])[1]
 
 
             bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
@@ -221,8 +221,8 @@ function makeM_crossSect(z_tabCS,var_listLF,dataCS_tab,fdataHF_tab,Sm_bit,prior_
             idx_itm1_z = bit_rownum .& bit_colnum_itm1_z;   # a bit_vector specifying which position in y^m correspond to the entries of it_z
             idx_it_z = bit_rownum .& bit_colnum_it_z;       # a bit_vector specifying which position in y^m correspond to the entries of it_z
             
-            M_cs[it_z,idx_it_z] = @view values(weightsCS_tab[weight_dates.==it_z_date])[:]
-            M_cs[it_z,idx_itm1_z] = -values(weightsCS_tab[weight_dates.==it_z_date])[:]
+            M_cs[it_z,idx_it_z] = @view values(weightsCS_tab[weights_dates.==it_z_date])[:]
+            M_cs[it_z,idx_itm1_z] = -values(weightsCS_tab[weights_dates.==it_z_date])[:]
         end
         
         # drop now the first rows
@@ -294,4 +294,109 @@ function makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp)
     end
 
     return M_inter_agg
+end
+
+
+@doc raw"""
+    make_mf_constraints(set_struct,data_struct)
+
+    Generates inter-temporal and cross-sectional constraints matrices for the mixed frequency model to condition on additional information.
+    The matrices are combined in one large matrix M and one vector z such that for a given vector with unobserved values $z = My^m$ holds.
+
+"""
+function make_mf_constraints(set_struct,data_struct)
+    @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp, show_prog = set_struct
+    @unpack dataHF_tab,dataLF_tab, var_list = data_struct
+    if typeof(data_struct) <: BEAVARs.BVARmodelDataSetup_MFcs
+       @unpack z_cs_tab, dataw_cs_tab, var_list, cs_scVal = data_struct
+    end
+
+    varNamesLF = Vector{Symbol}(colnames(dataLF_tab))
+    z_inter_tab = dataLF_tab
+
+    fdataHF_tab = merge(
+        dataHF_tab,
+        map((timestamp, values) -> (timestamp, values .* NaN), z_inter_tab[varNamesLF]),
+        method = :outer,
+    )
+    fdataHF_tab = fdataHF_tab[var_list]
+    fvarNames::Vector{Symbol} = Vector{Symbol}(colnames(fdataHF_tab))
+    datesHF::Vector{Date} = timestamp(fdataHF_tab)
+    datesLF::Vector{Date} = timestamp(z_inter_tab)
+    
+    freqL_date = get_data_freq(dataLF_tab);
+    freqH_date = get_data_freq(dataHF_tab);
+
+    if freqL_date == Month(0)
+        freqL_date = Month(12)
+    end 
+    # tuple showing the specification: 1, 3, 12 are monthly quarterly, annually and 0,1 is growth rates or log-levels
+    freq_mix_tp = (convert(Int,freqH_date/Month(1)), convert(Int,freqL_date/Month(1)),prior_RW) # tuple with the high and low frequencies. 1 is monthly, 3 is quarterly, 12 is annually
+
+        
+    # add the forecast periods to the data
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(n_fcst+1)) # the added quarters for the forecast. We add one more which will be deleted just to make sure that we have enough months to cover the whole quarter (e.g. Q2 is 01.04. but monthly it is up to 01.06.)
+    datesHF_fcast = (datesHF[end]+freqH_date:freqH_date:datesLF_fcast[end]-freqH_date);      # the added high frequency data for the forecast
+    HF_n_fcst = size(datesHF_fcast,1);                  # length of the high-frequency forecast
+
+    T = eltype(TimeSeries.values(dataHF_tab))
+    hf_values = TimeSeries.values(fdataHF_tab)::Matrix{T}
+    fdataHF_values = [hf_values; fill(T(NaN), HF_n_fcst, length(fvarNames))]
+    fdataHF_tab = TimeArray([timestamp(fdataHF_tab); datesHF_fcast], fdataHF_values, var_list)
+    fdatesHF = timestamp(fdataHF_tab);
+    fdatesLF = collect(timestamp(z_inter_tab)[1]:Month(freq_mix_tp[2]):fdatesHF[end]);
+    M_inter_agg = BEAVARs.makeMInterAgg(fdatesLF,fdatesHF,freq_mix_tp);
+
+    Sm_bit  = isnan.(TimeSeries.values(fdataHF_tab)');
+    nm      = sum(Sm_bit);          # the number of missing values
+    Tf      = size(fdataHF_tab,1)
+
+    M_inter, z_inter_vec, T_z_inter, O_inter= BEAVARs.makeM_intertemp(z_inter_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf);
+    if typeof(data_struct)<:BEAVARs.BVARmodelDataSetup_MFcs
+        M_cs, z_cs_vec,T_z_cs, O_cs = BEAVARs.makeM_crossSect(z_cs_tab,varNamesLF,dataw_cs_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal);
+
+        M_z = [M_inter; M_cs];
+        z_vec = [z_inter_vec; z_cs_vec];
+        T_z = T_z_inter + T_z_cs;
+        O_z = zeros(T_z,T_z); 
+        O_z[1:T_z_inter,1:T_z_inter] .= O_inter; 
+        O_z[T_z_inter+1:T_z_inter+T_z_cs,T_z_inter+1:T_z_inter+T_z_cs] .= O_cs; 
+    elseif typeof(data_struct)<:BEAVARs.BVARmodelDataSetup_MF
+        M_z = M_inter;
+        z_vec =z_inter_vec;
+        T_z = T_z_inter;
+        O_z = zeros(T_z,T_z); 
+        O_z[1:T_z_inter,1:T_z_inter] = O_inter; 
+    end
+
+    return M_z, z_vec, T_z, O_z, fdataHF_tab, z_inter_tab, freq_mix_tp, fdatesHF, fdatesLF,  HF_n_fcst, M_inter_agg
+end
+
+
+
+function check_cs_constraint(out_struct,set_struct,data_struct)
+    if typeof(data_struct) <: BVARmodelDataSetup_MFcs == false
+        error("you can only check the cross-sectional constraint for a model with such a constraint")
+    end
+    @unpack prior_RW = set_struct;
+    @unpack dataw_cs_tab, z_cs_tab = data_struct;
+    @unpack YYforHF_struct = out_struct;
+    varNames_LF = colnames(dataw_cs_tab);
+    if prior_RW == 0
+        # a1 = TimeSeries.values(out_struct.YYforHF_struct.YYfor_med_tab[:gdpNRW, :gdpDEoNRW]) 
+        a2 = values(dataw_cs_tab[ TimeSeries.timestamp(YYforHF_struct.YYfor_med_tab[varNames_LF])])
+        sum_out_tab = sum(YYforHF_struct.YYfor_med_tab[varNames_LF].*a2,dims=2)
+        plot(sum_out_tab)
+        plot!(z_cs_tab)
+        both_sum_z_tab = [sum_out_tab data_struct.z_cs_tab];
+    elseif prior_RW== 1
+        YYfor_med_pc_tab = diff(YYforHF_struct.YYfor_med_tab[varNames_LF]);
+        YYfor_med_pc_dates = timestamp(YYfor_med_pc_tab);
+        a2 = values(dataw_cs_tab[YYfor_med_pc_dates])
+        sum_out_tab = sum(YYfor_med_pc_tab.*a2,dims=2)
+        plot(sum_out_tab)
+        plot!(z_cs_tab[YYfor_med_pc_dates])
+        both_sum_z_tab = [sum_out_tab data_struct.z_cs_tab[YYfor_med_pc_dates]];
+    end
+    return both_sum_z_tab
 end

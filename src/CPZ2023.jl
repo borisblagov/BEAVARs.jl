@@ -129,8 +129,7 @@ function init_MF_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray
     fvarNames::Vector{Symbol} = Vector{Symbol}(colnames(fdataHF_tab))
     datesHF::Vector{Date} = timestamp(fdataHF_tab)
     datesLF::Vector{Date} = timestamp(z_tab)
-    # freqL_date::Month = Month(datesLF[2]) - Month(datesLF[1])
-    # freqH_date::Month = Month(datesHF[2]) - Month(datesHF[1])
+    
     freqL_date = get_data_freq(dataLF_tab);
     freqH_date = get_data_freq(dataHF_tab);
 

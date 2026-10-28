@@ -6,7 +6,11 @@
 # The Den: this is where the beavars live
 #-------------------------------------
 
+@doc raw"""
+    beavar(::BGR2010_type, set_struct, hyp_struct, data_struct)
 
+    Main function for the dummy variable approach of Banbura, Giannnone, and Reichling (2010)
+"""
 function beavar(::BGR2010_type, set_struct, hyp_struct, data_struct)
     println("Hello BGR2010")
     YY = values(data_struct.data_tab);

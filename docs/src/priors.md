@@ -1,4 +1,4 @@
-# Priors
+# Priors on $B$ and $\Sigma$
 
 Estimating Bayesian VARs boils down to the choice of priors regarding the parameters for the chosen VAR model. The package contains various specifications of a VAR with their respective prior choices. The following section outlines them.
 
@@ -89,3 +89,6 @@ We draw the $\mathbf{B}$ matrices using the Minnesota prior above and use an inv
 ## Natural conjugate prior 
 
 The natural conjugate prior is drawn again using the normal distribution for the $\mathbf{B}$ and an inverse-Wishart for the variance-covariance matrix $\Sigma$. The main benefit is that it is very fast, because there is no MCMC. The drawback is that you cannot implement the features of the Minnesota prior of shrinking different variables differently and scaling the variables differently. This means that your data is best to be standardized.
+
+
+## Common stochastic volatility
