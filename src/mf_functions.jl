@@ -337,6 +337,17 @@ function make_mf_constraints(set_struct,data_struct)
     # add the forecast periods to the data
     datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(n_fcst+1)) # the added quarters for the forecast. We add one more which will be deleted just to make sure that we have enough months to cover the whole quarter (e.g. Q2 is 01.04. but monthly it is up to 01.06.)
     datesHF_fcast = (datesHF[end]+freqH_date:freqH_date:datesLF_fcast[end]-freqH_date);      # the added high frequency data for the forecast
+
+    # if we are not doing any forecast (n_fcst == 0) we need to make sure that we have a full low-frequency period for the aggregation later on
+    if length(datesHF_fcast) == 0 && n_fcst == 0       
+        lastHF_needed = datesLF_fcast[end]+freqL_date-freqH_date         # current last datesLF_fcast period + # of quarters/months needed for a full lf period
+        datesHF_fcast = datesHF[end]+freqH_date:freqH_date:lastHF_needed # expand until the end of the year/quarter
+        ss = length(datesHF_fcast);
+        println("Forecast periods for the low frequency are set to 0.")
+        println("However, there are not enough high-frequency observations to aggregate the high freuqency to low-frequency.")
+        println("Adding $ss high frequency observations to complete the period")
+    end
+
     HF_n_fcst = size(datesHF_fcast,1);                  # length of the high-frequency forecast
 
     T = eltype(TimeSeries.values(dataHF_tab))
@@ -388,7 +399,7 @@ function check_cs_constraint(out_struct,set_struct,data_struct)
         sum_out_tab = sum(YYforHF_struct.YYfor_med_tab[varNames_LF].*a2,dims=2)
         plot(sum_out_tab)
         plot!(z_cs_tab)
-        both_sum_z_tab = [sum_out_tab data_struct.z_cs_tab];
+        both_sum_z_tab = merge(sum_out_tab, data_struct.z_cs_tab);
     elseif prior_RW== 1
         YYfor_med_pc_tab = diff(YYforHF_struct.YYfor_med_tab[varNames_LF]);
         YYfor_med_pc_dates = timestamp(YYfor_med_pc_tab);
@@ -396,7 +407,7 @@ function check_cs_constraint(out_struct,set_struct,data_struct)
         sum_out_tab = sum(YYfor_med_pc_tab.*a2,dims=2)
         plot(sum_out_tab)
         plot!(z_cs_tab[YYfor_med_pc_dates])
-        both_sum_z_tab = [sum_out_tab data_struct.z_cs_tab[YYfor_med_pc_dates]];
+        both_sum_z_tab = merge(sum_out_tab, data_struct.z_cs_tab);
     end
     return both_sum_z_tab
 end

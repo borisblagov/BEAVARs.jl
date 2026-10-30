@@ -300,7 +300,8 @@ function init_pbsi_struct(YYt, Sm_bit, So_bit, n, p, const_loc, Tf, nm, nmdraws,
     Gm      = HB*Smsp; 
     Go      = HB*Sosp; 
     GΣ      = Gm'*Σf_inv_bb; 
-    Kym     = GΣ*Gm; # we can initialize all these and then mutate with mul!()
+    Kym     = zeros( size(GΣ,1),size(Gm,2))
+    Kym     = mul!(Kym,GΣ,Gm); # we can initialize all these and then mutate with mul!()
     long_pr = similar(cB);
     μ_y     = zeros(nm,);
     μ_yBar  = zeros(nm,);

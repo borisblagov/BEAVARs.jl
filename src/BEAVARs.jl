@@ -131,6 +131,7 @@ See also `makeDataSetup`.
     dataw_cs_tab::TimeArray{T,N4,D,A4}                      # weights for the low-frequency variables that sum on each row to 1
     var_list::Vector{Symbol}                                # Symbol vector with the variable names, will be used for ordering
     cs_scVal;                                               # error tolerance for the cross-sectional constraint
+    endog_flag::Bool    
 end
 
 

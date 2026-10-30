@@ -112,8 +112,7 @@ end
 
 
 function xlsx2ta(data_mat)
-    data_mat = data_mat[.!ismissing.(data_mat[:,1]),:];             # sometimes XLSX reads empty rows below the last one (especially conditional formatting), here we remove them
-
+    data_mat = data_mat[.!ismissing.(data_mat[:,2]),:];             # sometimes XLSX reads empty rows below the last one (especially conditional formatting), here we remove them
     nan_mat =  fill(NaN, size(data_mat,1),size(data_mat,2));
     data_mat[ismissing.(data_mat)]=nan_mat[ismissing.(data_mat)];   # replace all missing with NaN
     values_mat = convert(Array{Float64},data_mat[2:end,2:end])      # convert values to numbers
@@ -183,12 +182,12 @@ end
     reads weights for time series cross-sectional aggregation from a custom sheet
 """
 function read_spec_weights(sheet_name,data_path)
-    data_path = "data/Specification_weights_nrw.xlsx"
     xf = XLSX.readxlsx(data_path);
     sh_names = XLSX.sheetnames(xf)
     sh_ref = xf[sheet_name];
     sh_mat = sh_ref[:]
-    dates = Date.(Int.(sh_mat[2:end, 1]), 1, 1)
+    # dates = Date.(Int.(sh_mat[2:end, 1]), 1, 1)
+    dates = Date.(sh_mat[2:end, 1])
     values = Float64.(sh_mat[2:end, 2:end])
     colnames = Symbol.(String.(sh_mat[1, 2:end]))
     ta=TimeArray(dates, values, colnames)

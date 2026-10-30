@@ -98,17 +98,18 @@ end
   high-frequency variable names followed by the low-frequency variable names.
 - `cs_scVal`: Error tolerance for the cross-sectional constraint, used as the
   diagonal error variance for its observations. Smaller values enforce the
-  constraint more tightly; the default is `1e-7`. If your data is in percentage changes 
-  you might get oscillations if you set it too tight (1e-6 seems to work well). 
+  constraint more tightly; the default is `1e-7`. If your data is in percentage points like  
+  percentage changes you might get oscillations if you set it too tight (1e-4 to 1e-6  seems to work well). 
+  Best have your data in decimals instead of percentage points.
   If you enfore a constraint in log-levels using data in decimal growth rates (as you should)
-  you need it tighter, e.g. `1e-8`. The default is in the middle.
+  you might need it tighter, e.g. `1e-8`. The default is in the middle somewhat.
 
 # Returns
 A `data_MFVAR_crossSect` data structure containing the supplied data,
 variable ordering, and cross-sectional constraint error scale.
 """
-function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataw_cs_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7)
-    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataw_cs_tab, var_list, cs_scVal)
+function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataw_cs_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
+    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataw_cs_tab, var_list, cs_scVal,endog_flag)
 end
 
 

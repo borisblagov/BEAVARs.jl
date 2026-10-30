@@ -143,6 +143,17 @@ function init_MF_TimeArrays(dataLF_tab::TimeArray{T,N,D,A},dataHF_tab::TimeArray
     # add the forecast periods to the data
     datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(n_fcst+1)) # the added quarters for the forecast. We add one more which will be deleted just to make sure that we have enough months to cover the whole quarter (e.g. Q2 is 01.04. but monthly it is up to 01.06.)
     datesHF_fcast = (datesHF[end]+freqH_date:freqH_date:datesLF_fcast[end]-freqH_date);      # the added high frequency data for the forecast
+    
+    # if we are not doing any forecast (n_fcst == 0) we need to make sure that we have a full low-frequency period for the aggregation later on
+    if length(datesHF_fcast) == 0 && n_fcst == 0      
+        lastHF_needed = datesLF_fcast[end]+freqL_date-freqH_date         # current last datesLF_fcast period + # of quarters/months needed for a full lf period
+        datesHF_fcast = datesHF[end]+freqH_date:freqH_date:lastHF_needed # expand until the end of the year/quarter
+        ss = length(datesHF_fcast);
+        println("Forecast periods for the low frequency are set to 0.")
+        println("However, there are not enough high-frequency observations to aggregate the high freuqency to low-frequency.")
+        println("Adding $ss low frequency observations to complete the period")
+    end
+    
     HF_n_fcst = size(datesHF_fcast,1);                  # length of the high-frequency forecast
 
     ta = TimeArray(datesHF_fcast, fill(NaN,HF_n_fcst,length(fvarNames)))
