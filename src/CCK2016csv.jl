@@ -124,7 +124,7 @@ function CCK2016_drawΣtsur!(vecYt,β_hat_struct,csv_Σt_struct,csv_h_struct,n,T
     Uvec .= vecYt .- mul!(Uvec,β_hat_struct.Xsur,β_hat_struct.β_draw) 
     U = reshape(Uvec,n,T);   
     BEAVARs.fast_triple_product!(Σt, U, csv_h_struct.expmh);                   # store U*Diagonal(exp.(-h)*U' + S_0 in Σt
-    Σt .= rand(InverseWishart(csv_Σt_struct.iw_df, Hermitian(Σt .+ csv_Σt_struct.S_0)));    # draw for Σ
+    Σt .= rand(InverseWishart(csv_Σt_struct.iw_df, Hermitian(Σt) .+ csv_Σt_struct.S_0));    # draw for Σ
     Σt_inv .= Σt\I;
     cholΣt_U .= cholesky(Σt).U;
     s2_h .= sum((U'/cholΣt_U).^2,dims=2);
