@@ -9,7 +9,9 @@ This is a personal package implementing various Bayesian VARs for economic analy
 
 
 
-# Available models in single frequency
+# Available models 
+
+VAR models with a single frequency:
 
  - [Chan2020minn](@ref): BVAR with classical  Minnesota prior (homoscedastic fixed variance-covariance matrix) as in Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, [https://doi.org/10.1007/978-3-030-31150-6](https://doi.org/10.1007/978-3-030-31150-6), see also [joshuachan.org](https://joshuachan.org) and his [pdf](https://joshuachan.org/papers/large_BVAR.pdf).
 
@@ -22,9 +24,10 @@ This is a personal package implementing various Bayesian VARs for economic analy
 
  - [BGR2010](@ref): BVAR with dummy observations as in Banbura, M., Giannone, D., and Reichlin, L. (2010), Large Bayesian vecotr auto regressions, _Journal of Applied Econometrics_, Vol 25(1), [doi.org/10.1002/jae.1137](https://doi.org/10.1002/jae.1137).
 
-# Available models with mixed-frequencies
 
-- [CPZ2023](@ref): Mixed-frequency Bayesian VAR based on the precision based sampler from Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005). This version uses an and independet Normal inverse-Wishart prior from [Chan2020iniw](@ref) above and not the csv prior in the CPZ(2023) paper.  
+VAR models with mixed frequencies frequency:
+
+- [CPZ2023iniw](@ref): An implementation of the mixed-frequency Bayesian VAR based on the precision based sampler from Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005). Uses an and independet Normal inverse-Wishart prior from [Chan2020iniw](@ref) above and not the csv prior in the aforementioned CPZ (2023) paper.  
 
 - [Blagov2027](@ref): A mixed-frequency Bayesian VAR based on an upcoming paper of mine. It is based on the precision-based sampler above, incorporates common stochastic volatilty, estimation of hyperparameters, and cross-sectional constraints.
 
@@ -52,3 +55,7 @@ I would like to thank the following people, who are all **not associated** with 
 
 - The name does not conform to the widely accepted convention of naming Julia packages (capital letter followed by all lowercase) but it [doesn't break any rules either](https://pkgdocs.julialang.org/v1/creating-packages/#Package-naming-rules). It isn't the only package with more than one capita letter, e.g. FFT, CUDA, CSV etc. Yes, it's an acronym, which can always be misleading. CSV may mean for you comma-separated value, but in my world it stands for common stochastic volatility :). And I still have no idea what FFT stands for and never googled it to make a point. Nevertheless, there should be minial confusion, because it's misspelled on purpose - the name Beaver.jl remains open, and if someone wants to use that we can still distinguish the packages BEAVARs.jl and Beavers.jl easily. 
 
+
+# Notes on AI usage
+
+This package has been written almost exclusively by hand, for better or for worse. LLMs have been used to add methods for performance optimizations. Those functions have been marked as "written by an LLM" and have each a test associated with it that tests against the my implementations. LLMs have also been used to add function documentation in few cases.

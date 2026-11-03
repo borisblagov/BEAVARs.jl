@@ -26,7 +26,11 @@ VAR models with a single frequency:
 
 Mixed frequency VARs:
 
-- [CPZ2023](@ref): Mixed-frequency Bayesian VAR as in Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005). Important: the mixed-frequency representation in the original paper does not rely on prior assumptions. This version uses the prior from [Chan2020iniw](@ref) above.  
+- [CPZ2023iniw](@ref): An implementation of the mixed-frequency Bayesian VAR based on the precision based sampler from Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005). Uses an and independet Normal inverse-Wishart prior from [Chan2020iniw](@ref) above and not the csv prior in the aforementioned CPZ (2023) paper.  
+
+- [Blagov2027](@ref): A mixed-frequency Bayesian VAR based on an upcoming paper of mine. It is based on the precision-based sampler above, incorporates common stochastic volatilty, estimation of hyperparameters, and cross-sectional constraints.
+
+
 
 
 Each model is implemented in a separate function, callable using the interface `beavar()`. See the documetnation for details. Note that notation follows the original reference. Consequently variable and parameter names are different across functions (e.g. $\lambda_1$ in one paper can be $c_1$ in another, even if they mean the same thing). 
@@ -50,7 +54,9 @@ I would like to thank the following people, who are all **not associated** with 
 
 - The name does not conform to the widely accepted convention of naming Julia packages (capital letter followed by all lowercase) but it [doesn't break any rules either](https://pkgdocs.julialang.org/v1/creating-packages/#Package-naming-rules). It isn't the only package with more than one capita letter, e.g. FFT, CUDA, CSV etc. Yes, it's an acronym, which can always be misleading. CSV may mean for you comma-separated value, but in my world it stands for common stochastic volatility :). And I still have no idea what FFT stands for and never googled it to make a point. Nevertheless, there should be minial confusion, because it's misspelled on purpose - the name Beaver.jl remains open, and if someone wants to use that we can still distinguish the packages BEAVARs.jl and Beavers.jl easily. 
 
+# Notes on AI usage
 
+This package has been written almost exclusively by hand, for better or for worse. LLMs have been used to add methods for performance optimizations. Those functions have been marked as "written by an LLM" and have each a test associated with it that tests against the my implementations. LLMs have also been used to add function documentation in few cases.
 
 # References
 

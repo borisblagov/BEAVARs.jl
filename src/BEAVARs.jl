@@ -224,7 +224,18 @@ end
     ae_mat::Array{T,N}          # forecast errors matrix
     pred_lik_mat::Array{T,N}          
     list_keys::Vector{String,}      
-    list_dates::Vector{Date,}      
+    list_dates::Vector{Date,}  
+    var_eval_list::Vector{Symbol}
+end
+
+
+@with_kw struct fcast_metrics{T<:AbstractFloat,N} <: BVARmodelEval
+    h_string::Vector{String}       # String with forecast horizons ("T+...")
+    msfe_mat::Array{T,N}          # mean squarte foreacst error
+    rmsfe_mat::Array{T,N}         # root mean squarte foreacst error
+    mafe_mat::Array{T,N}          # mean absolute error
+    apl_mat::Array{T,N}          # average predictive likelihood
+    var_eval_list::Vector{Symbol}
 end
 
 
@@ -301,12 +312,13 @@ end
 
 
 
-include("dataPrep.jl")
-include("init_functions.jl")
+include("funcs_dataPrep.jl")
+include("funcs_init.jl")
 include("gigrnd.jl")
 include("irfs.jl")
-include("plot_functions.jl")
-include("mf_functions.jl")
+include("funcs_plotting.jl")
+include("funcs_mf.jl")
+include("funcs_forecasting.jl")
 include("Chan2020base.jl")
 include("Chan2020new_funcs.jl")
 include("Chan2020minn.jl")
@@ -323,6 +335,12 @@ include("BGR2010.jl")
 # The Den: this is where the beavars live
 #-------------------------------------
 
+
+"""
+    beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+
+    
+"""
 function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
     fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
@@ -331,15 +349,25 @@ function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}
         println("Estimating data vintage $index")
         model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
         out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
-        fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
+        # fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
         vint_out_dict[index] = out_struct;
-        fcast_out_dict[index] = fcast_struct;
+        # fcast_out_dict[index] = fcast_struct;
     end
     
-    return vint_out_dict, fcast_out_dict
+    # return vint_out_dict, fcast_out_dict
+    return vint_out_dict
 end
 
-function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+
+
+"""
+    beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+
+
+        The parallel alternative to beavars function. Should be depreciated as another one is implemented
+        that does not write into the same ThreadSafeDict.
+"""
+function beavars_weave_dep(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
     fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
     ks = collect(keys(vint_in_dict))
@@ -351,93 +379,44 @@ function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
         @unpack model_type, set_struct, hyp_struct, data_struct,  = vint_in_dict[index];
         # model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
         out_struct = beavar(model_type, set_struct, hyp_struct, data_struct);
-        fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
+        # fcast_struct = BEAVARs.forecast(out_struct,set_struct,data_struct);
         vint_out_dict[index] = out_struct;
-        fcast_out_dict[index] = fcast_struct;
+        # fcast_out_dict[index] = fcast_struct;
     end
     
-    return vint_out_dict, fcast_out_dict
+    # return vint_out_dict, fcast_out_dict
+    return vint_out_dict
 end
 
 """
-    beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+    beavars_weave_new(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
 
-    prepare the forecasts for evaluation
+
+
 """
-function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
-    eval_vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelEval}()
-    ks = collect(keys(vint_out_dict))
-    n_eval = length(ks)
-    n_fcast = vint_dict[ks[1]].set_struct.n_fcst;
-    fe_mat=fill(NaN,n_fcast,n_eval)
-    pred_lik_mat=fill(NaN,n_fcast,n_eval)
-    list_keys = String[]
-    list_dates = Date[]
+function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+    jobs = [(key, vint_in_dict[key]) for key in keys(vint_in_dict)]
+    results_vec = Vector{Tuple{String, BEAVARs.BVARmodelOutput}}(undef, length(jobs))
+
+    Threads.@threads :greedy for i in eachindex(jobs)
+        key, loop_setup = jobs[i]
+        model_type, set_struct, hyp_struct, data_struct =
+            BEAVARs.unpackLoopSetup(loop_setup)
+
+        output = BEAVARs.beavar(model_type, set_struct, hyp_struct, data_struct)
+        results_vec[i] = (key, output)
+    end
+
+    vint_out_dict = ThreadSafeDict{String, BEAVARs.BVARmodelOutput}()
+    for (key, output) in results_vec
+        vint_out_dict[key] = output
+    end
     
-    for index in ks
-        println("Evaluating $index")
-        eval_vint_dict[index] = BEAVARs.eval_forecast(vint_out_dict[index], vint_dict[index].data_struct, vint_dict[index].set_struct, dataLF_true_ftab)
-        fe_mat[:,ks.==index] = eval_vint_dict[index].fcast_errors_mAd_mat
-        pred_lik_mat[:,ks.==index] = eval_vint_dict[index].pred_lik_mat
-        push!(list_keys, index)
-        push!(list_dates,eval_vint_dict[index].data_true_dates[1])
-    end
-
-    sfe_mat = fe_mat.^2;     # squared forecast error matrix
-    ae_mat  = abs.(fe_mat);  # absolute forecast error matrix
-
-    sort_ind            = sortperm(list_dates);
-    list_dates_sort     = list_dates[sort_ind];
-    list_keys_sort      = list_keys[sort_ind];
-    fe_mat_sort         = fe_mat[:,sort_ind];
-    sfe_mat_sort        = sfe_mat[:,sort_ind];
-    ae_mat_sort        = ae_mat[:,sort_ind];
-    pred_lik_mat_sort   = pred_lik_mat[:,sort_ind]
-
-    toEval_struct = BEAVARs.EvalForecast(fe_mat_sort,sfe_mat_sort,ae_mat_sort,pred_lik_mat_sort,list_keys_sort,list_dates_sort)
-
-    return toEval_struct, eval_vint_dict
+    # return vint_out_dict, fcast_out_dict
+    return vint_out_dict
 end
 
-"""
-    eval_forecasts(eval_struct)
 
-
-
-"""
-function eval_forecasts(eval_struct; drop_dates = Date[])
-    @unpack list_dates, list_keys, fe_mat, sfe_mat, ae_mat, pred_lik_mat =  eval_struct
-
-    if typeof(drop_dates)<:Date                             # check if the date supplied is a vector of dates (multiple) or only one, then convert it to Vector
-        drop_dates_vec = [drop_dates]
-    elseif typeof(drop_dates)<:StepRange
-        drop_dates_vec = collect(drop_dates)
-    elseif typeof(drop_dates)<:Vector{Date}
-        drop_dates_vec = drop_dates;
-    end
-    select_dates = list_dates .∉ Ref(drop_dates_vec)       # which forecast origins to keep
-
-    if iszero(select_dates)
-        error("No forecasts left to evaluate. You supplied a dates vector that lead to the dropping of all possible forecast origins.")
-    end
-
-    if any(select_dates.==0)
-        println("Dropping ", list_dates[select_dates.==0], "when evaluating.")
-    end
-
-    # apl_vec = log.(dropdims(BEAVARs.nanfunc(sum, exp.(pred_lik_mat); dims=2),dims=2)); # average predictive likelihood (gemoetric mean)
-    apl_vec = dropdims(BEAVARs.nanfunc(mean, pred_lik_mat[:,select_dates]; dims=2),dims=2); # average predictive likelihood 
-
-    msfe_vec = dropdims(BEAVARs.nanfunc(mean, sfe_mat[:,select_dates]; dims=2),dims=2)
-    mafe_vec = dropdims(BEAVARs.nanfunc(mean, ae_mat[:,select_dates]; dims=2),dims=2)
-    rmsfe_vec = sqrt.(msfe_vec);
-
-    n_fcast, n_eval = size(fe_mat);
-    h_values = ["T+$i" for i in 1:n_fcast]
-    fe_tab = (h = h_values, RMSFE = rmsfe_vec, MAFE = mafe_vec, APL = apl_vec)
-    pretty_table(fe_tab)
-    return fe_tab
-end
 
 #-------------------------------------
 end # END OF MODULE

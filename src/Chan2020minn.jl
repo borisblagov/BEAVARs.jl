@@ -104,11 +104,11 @@ end
 #-----------------------
 
 @doc raw"""
-    beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
+    beavar(::Chan2020minn_type, set_struct, hyp_struct, data_struct)
 
     Estimates a classical Minnesota BVAR with known variance-covariance matrix.
 """
-function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
+function beavar(::Chan2020minn_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello Minn")
     @unpack data_tab, data_mat, var_list = data_struct;
     @unpack n_fcst, n_save = set_struct;
@@ -119,7 +119,7 @@ function beavar(::Chan2020minn_type, set_struct, hyp_str, data_struct)
     YY = data_mat;
     T,n = size(YY);
     store_YY = fill(NaN,(T+n_fcst,n,n_save))
-    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_str);
+    store_β, store_Σ = Chan2020minn(YY,set_struct,hyp_struct);
     out_struct = VAROutput_Chan2020minn(store_β,store_Σ,YY,fdatesLF,store_YY);
     fcast_struct = forecast(out_struct, set_struct, data_struct);                   # TODO this has tremendous allocations, fix it
     out_struct.store_YY[:,:,:] =  @view fcast_struct.Yfor3d[:,:,:];

@@ -9,14 +9,14 @@
 #-------------------------------------
 
 @doc raw"""
-    beavar(::CCK2016csv_type, set_struct, hyp_str, data_struct)
+    beavar(::CCK2016csv_type, set_struct, hyp_struct, data_struct)
 
     Estimates a BVAR with common stochastic volatility as proposed by Carriero, Clark, and Marcellino (2016). 
 
     The implementation of csv follows Chan (2020) and draws `h`, the stochastic volatility, using a Newton Rapson method and not the CCK article with Shephard and Chib's 1998 method.
 
 """
-function beavar(::CCK2016csv_type, set_struct, hyp_str, data_struct)
+function beavar(::CCK2016csv_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello CCK2016csv")
     @unpack data_tab, data_mat, var_list = data_struct;
     freqL_date = BEAVARs.get_data_freq(data_tab);
@@ -24,7 +24,7 @@ function beavar(::CCK2016csv_type, set_struct, hyp_str, data_struct)
     datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
     fdatesLF = [datesLF;datesLF_fcast];
     YY = values(data_struct.data_tab);
-    store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2 = BEAVARs.CCK2016csv(YY,set_struct,hyp_str);
+    store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2 = BEAVARs.CCK2016csv(YY,set_struct,hyp_struct);
     out_struct = VAROutput_CCK2016csv(store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1,store_c2,YY)
     return out_struct
 end

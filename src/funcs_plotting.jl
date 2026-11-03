@@ -153,3 +153,7 @@ function plot_minn_hyperparameters(out_struct_csv;supertitle="Figure 3: Hyperpar
 end
 
 
+function print_feval(feval_struct)
+    pretty_table(feval_struct.rmsfe_mat; row_labels = feval_struct.h_string, column_labels = feval_struct.var_eval_list, title = "Average root mean squared forecast error")
+    pretty_table(feval_struct.apl_mat; row_labels = feval_struct.h_string, column_labels = feval_struct.var_eval_list, title = "Average predictive likelihood")
+end

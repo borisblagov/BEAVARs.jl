@@ -36,4 +36,8 @@ using BlockBandedMatrices, BlockArrays
             @test actual == expected
         end
     end
+
+    @testset "test_mf_constraints.jl" begin
+        include("test_mf_constraints.jl")
+    end
 end

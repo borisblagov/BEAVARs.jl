@@ -110,11 +110,45 @@ hf_ta = hf_ta[varList_HF];  # reorder back the variables
 return hf_ta
 end
 
+"""
+    xlsx2ta(data_mat_raw)
 
-function xlsx2ta(data_mat)
-    data_mat = data_mat[.!ismissing.(data_mat[:,2]),:];             # sometimes XLSX reads empty rows below the last one (especially conditional formatting), here we remove them
-    nan_mat =  fill(NaN, size(data_mat,1),size(data_mat,2));
-    data_mat[ismissing.(data_mat)]=nan_mat[ismissing.(data_mat)];   # replace all missing with NaN
+    Converts a Matrix{Any} read from excel to Matrix{Float64} and creates a TimeArray from it. 
+    The input should have the variable names in the first row and dates in the first column.
+    Those would be converted respectively to Date{} and Symbol{} types in the TimeArray.  
+    The function converts any missings to NaNs and deletes completely emtpy NaN rows that 
+    sometimes happen when reading data from excel.
+
+    ## Example
+    ```julia
+    A = [ "Date"  "Var1"  "Var2";
+            "1996-01-01"     missing     3.0 ;
+            "1997-01-01"     2.5     missing ;
+            missing     missing     missing ;
+            missing     missing     missing ]
+
+    julia> A = [ "Date"  "Var1"  "Var2";
+        "1996-01-01"     missing     3.0 ;
+        "1997-01-01"     2.5     missing ;
+        missing     missing     missing ;
+        missing     missing     missing ]
+    julia> BEAVARs.xlsx2ta(A)
+    2×2 TimeArray{Float64, 2, Date, Matrix{Float64}} 1996-01-01 to 1997-01-01
+    ┌────────────┬──────┬──────┐
+    │            │ Var1 │ Var2 │
+    ├────────────┼──────┼──────┤
+    │ 1996-01-01 │  NaN │  3.0 │
+    │ 1997-01-01 │  2.5 │  NaN │
+    └────────────┴──────┴──────┘
+    ```
+
+
+    See also BEAVARs.remove_nan_padding()
+"""
+function xlsx2ta(data_mat_raw)
+    nan_mat =  fill(NaN, size(data_mat_raw,1),size(data_mat_raw,2));
+    data_mat_raw[ismissing.(data_mat_raw)]=nan_mat[ismissing.(data_mat_raw)];   # replace all missing with NaN
+    data_mat = BEAVARs.remove_nan_padding(data_mat_raw)
     values_mat = convert(Array{Float64},data_mat[2:end,2:end])      # convert values to numbers
     date_vec = Date.(data_mat[2:end,1])                         # convert first column to DateTime
     # date_vecstr = Dates.DateFormat.(date_vec,"yyyy-mm-dd");
@@ -151,8 +185,8 @@ function readSpecMF(modelstr,data_path)
 
     # Reads the high-frequency
     datasheetHF_str = "datasheet" * string(sh_mat[sh_mat[:,1].=="datasheet",model_ind][1]) * "_HF";    # the high-frequency datasheet
-    data_mat = xf[datasheetHF_str][:];
-    dataf_HF_TA = BEAVARs.xlsx2ta(data_mat)
+    data_matHF_raw = xf[datasheetHF_str][:];
+    dataf_HF_TA = BEAVARs.xlsx2ta(data_matHF_raw)
     varList_HF = intersect(varListF,colnames(dataf_HF_TA));      # looks for which variables are required and which are found
     dataHF_TA = dataf_HF_TA[varList_HF];                         # selects the variables found in this TA
 
@@ -161,8 +195,8 @@ function readSpecMF(modelstr,data_path)
 
     # Reads the low-frequency
     datasheetLF_str = "datasheet" * string(sh_mat[sh_mat[:,1].=="datasheet",model_ind][1]) * "_LF";    # the low-frequency datasheet
-    data_mat = xf[datasheetLF_str][:];
-    dataf_LF_TA = BEAVARs.xlsx2ta(data_mat)
+    data_matLF_raw = xf[datasheetLF_str][:];
+    dataf_LF_TA = BEAVARs.xlsx2ta(data_matLF_raw)
     varList_LF = intersect(varListF,colnames(dataf_LF_TA));      # looks for which variables are required and which are found
     dataLF_TA = dataf_LF_TA[varList_LF];                         # selects the variables found in this TA
 
@@ -515,4 +549,37 @@ function write_timearrays_to_excel(qdata::TimeArray, ydata::TimeArray, filename:
             end
         end
     end
+end
+
+"""
+    remove_nan_padding(A)
+
+    ## Example 
+    A = [ "Col1"  "Col2"  "Col3";
+            1.0     NaN     3.0 ;
+            NaN     2.5     NaN ;
+            NaN     NaN     NaN ;
+            NaN     NaN     NaN ]
+
+    cleaned_A = remove_nan_padding(A)
+"""
+function remove_nan_padding(A)
+    n_rows = size(A, 1)
+    N = n_rows # Default if no padding is found
+    
+    # Helper to check if an element is NaN or missing safely 
+    # (prevents errors when checking non-numeric types like strings)
+    is_nan_or_missing(x) = (x isa Number && isnan(x)) || ismissing(x)
+    
+    # Start searching from row 2 downwards
+    for i in 2:n_rows
+        # Check if ALL columns in the current row are NaN or missing
+        if all(is_nan_or_missing, @view A[i, :])
+            N = i - 1  # The last valid row is right before this one
+            break
+        end
+    end
+    
+    # Return the trimmed matrix containing rows 1 to N
+    return A[1:N, :]
 end

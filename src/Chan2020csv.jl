@@ -3,14 +3,14 @@
 #-------------------------------------
 
 @doc raw"""
-    beavar(::Chan2020csv_type, set_struct, hyp_str, data_struct)
+    beavar(::Chan2020csv_type, set_struct, hyp_struct, data_struct)
 
     Estimates a BVAR with common stochastic volatility with a natural conjugate prior prior as proposed by Chan (2020).
 """
-function beavar(::Chan2020csv_type, set_struct, hyp_str, data_struct)
+function beavar(::Chan2020csv_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello Minn CSV")
     YY = values(data_struct.data_tab);
-    @time store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyp_str);
+    @time store_β, store_h, store_Σ, s2_h_store, store_ρ, store_σ_h2, store_eh = Chan2020csv(YY,set_struct,hyp_struct);
     out_struct = VAROutput_Chan2020csv(store_β,store_Σ,store_h,s2_h_store, store_ρ, store_σ_h2, store_eh,YY)
     return out_struct
 end

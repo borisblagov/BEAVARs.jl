@@ -11,7 +11,7 @@
 
     Main function for the dummy variable approach of Banbura, Giannnone, and Reichling (2010)
 """
-function beavar(::BGR2010_type, set_struct, hyp_struct, data_struct)
+function beavar(::BGR2010_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello BGR2010")
     YY = values(data_struct.data_tab);
     store_β, store_Σ = BGR2010(YY,set_struct,hyp_struct);

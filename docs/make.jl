@@ -10,12 +10,7 @@ makedocs(
         "Methods" => "methods.md",
         "Forecasting" => "forecasting.md",
         "Structural analysis" => "irfs.md",
-        "File library" => [
-            "Constructors" => "Constructors.md",
-            "Initialization" => "init_functions.md",
-            "Data transformation" => "dataPrep.md"
-        ],
-        "References" => "references.md"
+        "References" => "references.md",
     ]
 )
 deploydocs(
