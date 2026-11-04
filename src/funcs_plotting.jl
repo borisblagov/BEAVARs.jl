@@ -187,7 +187,7 @@ function print_feval(feval_struct)
 end
 
 
-function plot_mf_summary(out_struct::VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
+function plot_mf_summary(out_struct::BEAVARs.VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
     freq_mix_label_tuple = BEAVARs.int2strMF(out_struct.freq_mix_tp);
     BEAVARs.plot_minn_hyperparameters(out_struct,supertitle="Figure 1: Hyperparameters")
     BEAVARs.plot_stoch_vol(out_struct,supertitle="Figure 2: Stochastic volatility")
