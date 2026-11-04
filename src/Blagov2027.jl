@@ -720,7 +720,15 @@ function update_hf_expmhf!(hf,expmhf,csv_h_struct,Tf, T, p)
     sqrt_σ_h2 = sqrt(csv_h_struct.σ_h2_vec[1]);
     # extend h backwards for Y0 using the csv regression
     for io = p:-1:1 
-        hf[io] = (hf[io+1] - sqrt_σ_h2*randn())/csv_h_struct.ρ_vec[1]
+        if io == p
+            # draw h_0 from N( ρ*h/(1+ρ^2), σ_h2/(1+ρ^2)) using a normal prior
+            hf[io] =  csv_h_struct.ρ_vec[1]*hf[io+1]/(1+csv_h_struct.ρ_vec[1]^2) + sqrt(csv_h_struct.σ_h2_vec[1]/(1 + csv_h_struct.ρ_vec[1]^2))*randn()
+        else
+            # h0 conditions on the data, but h_{-1} conditions on the latent state so we use directly the AR(1) process 
+            # draw h_{-1} from N(ρ h_0, σ_h2)
+            hf[io] = csv_h_struct.ρ_vec[1]*hf[io+1]/(1+csv_h_struct.ρ_vec[1]^2) + sqrt_σ_h2*randn()
+
+        end
     end
     #extend them forward as well
     for io = T+p+1:Tf

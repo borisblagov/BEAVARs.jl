@@ -124,7 +124,7 @@ function CCK2016_drawΣtsur!(vecYt,β_hat_struct,csv_Σt_struct,csv_h_struct,n,T
     Uvec .= vecYt .- mul!(Uvec,β_hat_struct.Xsur,β_hat_struct.β_draw) 
     U = reshape(Uvec,n,T);   
     BEAVARs.fast_triple_product!(Σt, U, csv_h_struct.expmh);                   # store U*Diagonal(exp.(-h)*U' + S_0 in Σt
-    Σt .= rand(InverseWishart(csv_Σt_struct.iw_df, Hermitian(Σt) .+ csv_Σt_struct.S_0));    # draw for Σ
+    Σt .= rand(InverseWishart(csv_Σt_struct.iw_df, Σt .+ csv_Σt_struct.S_0));    # draw for Σ
     Σt_inv .= Σt\I;
     cholΣt_U .= cholesky(Σt).U;
     s2_h .= sum((U'/cholΣt_U).^2,dims=2);
@@ -168,11 +168,11 @@ struct make_csv_h_struct{T <: AbstractFloat}
     sieht::Array{T,1}
     G_h::Array{T,1}
     f_h::Array{T,1}
-    s2_h::Array{T,1}
-    eh::Array{T,1}
+    s2_h::Array{T,1}            # sum of squared residuals
+    eh::Array{T,1}              # errors of the AR(1) process for h
     H_ρ::SparseMatrixCSC{T,Int}
     ρ_vec::Array{T,1}
-    σ_h2_vec::Array{T,1}
+    σ_h2_vec::Array{T,1}        # variance of the errors of the AR(1) process for h, h_t = ρ h_{t-1} + ε_t, ε_t ~ N(0,σ_h2)
     K_h::SparseMatrixCSC{T,Int}
     expmhf::Array{T,1}                  # exp.(-h) for T+p = Tf, used for the presicion based sampler, where we need the initial conditions
 end
@@ -193,7 +193,7 @@ function init_csv_struct(h,hyp_struct,T,Tf)
     expmhf      = [repeat([exp.(-h[1])],Tf-T); exp.(-h)];  # currently we just copy the first one. drawing the initial conditions would be better for correctness
     ρ_vec       = zeros(1,); σ_h2_vec = zeros(1,);
     ρ_vec[1]    = ρ;
-    σ_h2_vec[1] = σ_h2;
+    σ_h2_vec[1] = σ_h2;         
     H_ρ         = sparse(Matrix(1.0I, T, T)) - sparse(ρ*diagm(-1=>repeat(1:1,T-1)));
     H_inv       = H_ρ'*(Diagonal([(1.0-ρ^2)/σ_h2; 1.0/σ_h2*ones(T-1,)]))*H_ρ;
     K_h         = similar(H_inv);
