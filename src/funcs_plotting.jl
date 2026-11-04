@@ -144,7 +144,7 @@ function plot_YY(YYfor_struct,var_list;supertitle="",monitor_size=(1920, 1080))
 end
 
 
-"""
+@doc raw"""
     plot_ribbons_on_subplot(p_hand,YYfor_struct,ik,var_name)
 
     Plots a fan-chart plot of a custom structure with probability intervals for the median, 
