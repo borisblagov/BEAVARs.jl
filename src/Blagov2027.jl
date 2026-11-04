@@ -741,6 +741,15 @@ function update_hf_expmhf!(hf,expmhf,csv_h_struct,Tf, T, p)
 end
 
 
+function plot_mf_summary(out_struct::BEAVARs.VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
+    freq_mix_label_tuple = BEAVARs.int2strMF(out_struct.freq_mix_tp);
+    BEAVARs.plot_minn_hyperparameters(out_struct,supertitle="Figure 1: Hyperparameters")
+    BEAVARs.plot_stoch_vol(out_struct,supertitle="Figure 2: Stochastic volatility")
+    BEAVARs.plot_YY(out_struct.YYforLF_struct,data_struct.var_list,supertitle="Figure 3: "*freq_mix_label_tuple[2]*" variables")
+    BEAVARs.plot_YY(out_struct.YYforHF_struct,data_struct.var_list,supertitle="Figure 4: "*freq_mix_label_tuple[1]*" variables")
+end
+
+
 
 
 # for progress bar evaulation
