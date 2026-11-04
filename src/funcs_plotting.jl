@@ -136,19 +136,47 @@ function plot_YY(YYfor_struct,var_list;supertitle="",monitor_size=(1920, 1080))
     p_hand = plot(layout=lout,size = monitor_size, suptitle=supertitle)
     for ik in eachindex(var_list)
         var_name = var_list[ik];
-        plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=0;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low05_tab[var_name]),values(YYfor_struct.YYfor_hih95_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.1,color=1,legend=false,subplot=ik);
-        plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=2;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low16_tab[var_name]),values(YYfor_struct.YYfor_hih84_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.2,color=1,legend=false,subplot=ik,title=var_name); 
-        
+        plot_ribbons_on_subplot(p_hand,YYfor_struct,ik,var_name)  
     end
+    
     display(p_hand)
+    return p_hand
 end
 
 
+"""
+    plot_ribbons_on_subplot(p_hand,YYfor_struct,ik,var_name)
 
-function plot_minn_hyperparameters(out_struct_csv;supertitle="Figure 3: Hyperparameters",monitor_size=(800, 400))
+    Plots a fan-chart plot of a custom structure with probability intervals for the median, 
+    and the percentiles corresponding to the 68%, 90%, and 95% probability intervals. 
+
+    plots on `p_hand` at `ik` subplot with title `var_name`.
+
+"""
+function plot_ribbons_on_subplot(p_hand,YYfor_struct,ik,var_name)
+    plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=0;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low05_tab[var_name]),values(YYfor_struct.YYfor_hih95_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.1,color=1,legend=false,subplot=ik);
+    plot!(p_hand,YYfor_struct.YYfor_med_tab[var_name],w=2;ribbon=(values(YYfor_struct.YYfor_med_tab[var_name].-YYfor_struct.YYfor_low16_tab[var_name]),values(YYfor_struct.YYfor_hih84_tab[var_name] .- YYfor_struct.YYfor_med_tab[var_name])),fillalpha = 0.2,color=1,legend=false,subplot=ik,title=var_name); 
+end
+
+
+function plot_minn_hyperparameters(out_struct;supertitle="Figure 3: Hyperparameters",monitor_size=(800, 400))
     p_hand = plot(layout= (1,2),size = monitor_size, suptitle=supertitle)
-    histogram!(p_hand,out_struct_csv.store_c1,subplot=1,title="κ1",legend=false);         
-    histogram!(p_hand,out_struct_csv.store_c2,subplot=2,title="κ2",legend=false);         
+    histogram!(p_hand,out_struct.store_c1,subplot=1,title="κ1",legend=false);         
+    histogram!(p_hand,out_struct.store_c2,subplot=2,title="κ2",legend=false);         
+    display(p_hand)
+end
+
+function plot_stoch_vol(out_struct;supertitle="Stochastic volatiltiy",monitor_size = (800, 400))
+    exph_pi_struct = BEAVARs.makeProbabilityIntervalsStruct(exp.(out_struct.store_hf),out_struct.fdatesHF,[:h])
+
+    lout = @layout [a{0.5h}
+                grid(1,2)
+                  ]; 
+    p_hand = plot(layout=lout,size = monitor_size, suptitle=supertitle)
+    BEAVARs.plot_ribbons_on_subplot(p_hand,exph_pi_struct,1,:h)
+    title!(p_hand[1],"Estimated stochastic volatility")
+    histogram!(p_hand,out_struct.store_ρ,subplot=2,title=L"ρ_h",legend=false); 
+    histogram!(p_hand,out_struct.store_σ_h2,subplot=3,title=L"σ^2_h",legend=false); 
     display(p_hand)
 end
 
@@ -156,4 +184,13 @@ end
 function print_feval(feval_struct)
     pretty_table(feval_struct.rmsfe_mat; row_labels = feval_struct.h_string, column_labels = feval_struct.var_eval_list, title = "Average root mean squared forecast error")
     pretty_table(feval_struct.apl_mat; row_labels = feval_struct.h_string, column_labels = feval_struct.var_eval_list, title = "Average predictive likelihood")
+end
+
+
+function plot_mf_summary(out_struct::VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
+    freq_mix_label_tuple = BEAVARs.int2strMF(out_struct.freq_mix_tp);
+    BEAVARs.plot_minn_hyperparameters(out_struct,supertitle="Figure 1: Hyperparameters")
+    BEAVARs.plot_stoch_vol(out_struct,supertitle="Figure 2: Stochastic volatility")
+    BEAVARs.plot_YY(out_struct.YYforLF_struct,data_struct.var_list,supertitle="Figure 3: "*freq_mix_label_tuple[2]*" variables")
+    BEAVARs.plot_YY(out_struct.YYforHF_struct,data_struct.var_list,supertitle="Figure 4: "*freq_mix_label_tuple[1]*" variables")
 end

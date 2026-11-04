@@ -385,6 +385,38 @@ function get_imp_percentiles_llm(YYmat_3d::AbstractArray{T,3}) where {T<:Abstrac
     )
 end
 
+"""
+    get_imp_percentiles_llm(YYmat_2d::AbstractArray{T,2}) where {T<:AbstractFloat}
+
+    Alternative function to get_imp_percentiles, which is type stable.
+
+    Written by llm and there is a test in the testsuite that checks the output versus get_imp_percentiles()
+
+    See also get_imp_percentiles()
+"""
+function get_imp_percentiles_llm(YYmat_2d::AbstractArray{T,2}) where {T<:AbstractFloat}
+    function percentile_over_columns(p)
+        result = Vector{T}(undef, size(YYmat_2d, 1))
+
+        for (i_out, i) in enumerate(axes(YYmat_2d, 1))
+            result[i_out] = quantile(view(YYmat_2d, i, :), p)
+        end
+
+        return result
+    end
+
+    return (
+        percentile_over_columns(0.025),
+        percentile_over_columns(0.05),
+        percentile_over_columns(0.16),
+        percentile_over_columns(0.5),
+        percentile_over_columns(0.84),
+        percentile_over_columns(0.95),
+        percentile_over_columns(0.975),
+    )
+end
+
+
 
 function int2strMF(freq_mix_tp)
     if length(freq_mix_tp) == 3 # case for a two-frequency model, where the tuple has only three elements

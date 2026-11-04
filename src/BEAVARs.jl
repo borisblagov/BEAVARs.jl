@@ -13,7 +13,8 @@ using   LinearAlgebra,
         Random,
         KernelDensity,
         Tables,
-        PrettyTables
+        PrettyTables,
+        LaTeXStrings
 
 # from init_functions.jl
 export mlag, mlagL, mlagL!, percentile_mat

@@ -35,6 +35,17 @@ using BlockBandedMatrices, BlockArrays
         for (expected, actual) in zip(reference, optimized)
             @test actual == expected
         end
+
+        draws_2d = reshape(Float64.(1:20), 4, 5)
+        probs = (0.025, 0.05, 0.16, 0.5, 0.84, 0.95, 0.975)
+        actual_2d = BEAVARs.get_imp_percentiles_llm(draws_2d)
+        expected_2d = ntuple(i -> BEAVARs.percentile_mat(draws_2d, probs[i]; dims=2), 7)
+
+        @test length(actual_2d) == 7
+        for (expected, actual) in zip(expected_2d, actual_2d)
+            @test actual == expected
+            @test size(actual) == (size(draws_2d, 1),)
+        end
     end
 
     @testset "test_mf_constraints.jl" begin

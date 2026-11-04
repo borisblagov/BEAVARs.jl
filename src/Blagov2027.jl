@@ -38,12 +38,12 @@ end
 function beavar(::Blagov2027_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
     println("Hello Blagov2027")
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
-    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg = Blagov2027(set_struct,hyp_struct,data_struct)    
+    store_YY, store_YY_LF, store_β,  store_Σt, store_Σt_inv, store_h, store_hf, store_s2_h,store_σ_h2,store_ρ, store_eh, store_c1,store_c2, M_zsp, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF,M_inter_agg, n_fcst_hf = Blagov2027(set_struct,hyp_struct,data_struct)    
     YYforHF_struct = makeProbabilityIntervalsStruct(store_YY,fdatesHF,var_list);
     YYforLF_struct = makeProbabilityIntervalsStruct(store_YY_LF,fdatesLF,var_list);
     data_flags_vec = fdatesLF .∈  Ref(timestamp(dataLF_tab));       # bit_vector showing the data position of the low-frequency variable
     forecast_flags_vec = .!data_flags_vec;                          # bit_vector showing the forecasted position. Only supports balanced z_tab #TODO: make it work for unbalanced z_tab
-    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_s2_h,store_ρ,store_σ_h2, store_eh, store_c1,store_c2, M_inter_agg, fdatesHF, fdatesLF, YYforLF_struct, YYforHF_struct,data_flags_vec,forecast_flags_vec);
+    out_struct = VAROutput_Blagov2027(store_YY,store_YY_LF,store_β,store_Σt_inv, M_zsp, z_vec, Sm_bit,freq_mix_tp,store_Σt, store_h, store_hf,store_s2_h,store_ρ,store_σ_h2, store_eh, store_c1,store_c2, M_inter_agg, fdatesHF, fdatesLF, YYforLF_struct, YYforHF_struct,data_flags_vec,forecast_flags_vec);
     return out_struct
 end
 
@@ -372,6 +372,7 @@ function Blagov2027(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,dat
     store_Σt = zeros(n,n,n_save);
     store_Σt_inv = zeros(n,n,n_save);
     store_h = zeros(T,n_save);
+    store_hf = zeros(length(hf),n_save);
     store_s2_h = zeros(T,n_save);
     store_ρ = zeros(n_save,);
     store_σ_h2 = zeros(n_save,); 
@@ -426,6 +427,7 @@ function Blagov2027(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,dat
             store_Σt_inv[:,:,ii-n_burn] = csv_Σt_struct.Σt_inv;
             store_Σt[:,:,ii-n_burn] = csv_Σt_struct.Σt;
             store_h[:,ii-n_burn] = csv_h_struct.h;
+            store_hf[:,ii-n_burn] = hf;
             store_s2_h[:,ii-n_burn] = csv_h_struct.s2_h;
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
@@ -440,7 +442,7 @@ function Blagov2027(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,dat
         end
     end
     store_YY_LF = mapslices(x->M_inter_agg*x,store_YY,dims=1:2);
-    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_z, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg
+    return store_YY, store_YY_LF, store_β, store_Σt, store_Σt_inv, store_h, store_hf, store_s2_h, store_ρ, store_σ_h2,store_eh, store_c1,store_c2, M_z, z_vec, Sm_bit, freq_mix_tp, fdatesHF, fdatesLF, M_inter_agg, n_fcst_hf
 
 end
 
@@ -460,6 +462,7 @@ end
     freq_mix_tp::Tuple{Int,Int,Int}
     store_Σt::Array{T,3}        # 
     store_h::Array{T,N}        # 
+    store_hf::Array{T,N}        # 
     store_s2_h::Array{T,N}     # 
     store_ρ::Array{T,1}        # 
     store_σ_h2::Array{T,1}     # 
@@ -737,13 +740,6 @@ function update_hf_expmhf!(hf,expmhf,csv_h_struct,Tf, T, p)
     expmhf .= exp.(-hf);
 end
 
-
-function plot_mf_summary(out_struct::VAROutput_Blagov2027,data_struct::BVARmodelDataSetup)
-    freq_mix_label_tuple = BEAVARs.int2strMF(out_struct.freq_mix_tp);
-    BEAVARs.plot_YY(out_struct.YYforHF_struct,data_struct.var_list,supertitle="Figure 1: "*freq_mix_label_tuple[1]*" variables")
-    BEAVARs.plot_YY(out_struct.YYforLF_struct,data_struct.var_list,supertitle="Figure 1: "*freq_mix_label_tuple[2]*" variables")
-    BEAVARs.plot_minn_hyperparameters(out_struct)
-end
 
 
 
