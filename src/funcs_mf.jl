@@ -189,7 +189,9 @@ function makeM_crossSect(z_cs_tab,var_listLF,dataw_cs_tab,fdataHF_tab,Sm_bit,pri
         # we now want to loop over each entry of the date in z_cs_tab and then fix that year to the cartesian indices of the unobserved variables
         for it_z = 1:T_z_cs
             it_z_date = TimeSeries.timestamp(z_cs_tab[it_z])[1]
-
+            if timestamp(fdataHF_tab)[end]<it_z_date
+                error("The dates in the constraint table z_cs_tab extend beyond the forecast horizon. Consider making z_cs shorter or extend the forecast horizon ")
+            end
             bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
             for io = 2:n_cs_var
                 bit_io = ym_rownum.==z_varCS_pos[io]
@@ -209,7 +211,9 @@ function makeM_crossSect(z_cs_tab,var_listLF,dataw_cs_tab,fdataHF_tab,Sm_bit,pri
         for it_z = 2:T_z_cs
             itm1_z_date = TimeSeries.timestamp(z_cs_tab[it_z-1])[1]
             it_z_date = TimeSeries.timestamp(z_cs_tab[it_z])[1]
-
+            if timestamp(fdataHF_tab)[end]<it_z_date
+                error("The dates in the constraint table z_cs_tab extend beyond the forecast horizon. Consider making z_cs shorter or extend the forecast horizon.")
+            end
 
             bit_rownum = ym_rownum.==z_varCS_pos[1];        # = 1 for every entry in y^m that corresponds to a variable from weightsCS_tab but in the high-frequency
             for io = 2:n_cs_var
