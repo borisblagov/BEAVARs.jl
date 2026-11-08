@@ -157,12 +157,14 @@ function xlsx2ta(data_mat_raw)
     return dataf_TA
 end
 
+
+
 @doc raw""" 
     readSpecMF(modelstr,data_path)
 
     Reads custom Excel file and formats the data for use in Julia
 """
-function readSpecMF(modelstr,data_path)
+function readSpecMF(modelstr,data_path; model_sh_name_ident = "datasheet",weights_sh_name_ident="weights",readCS = false)
     xf = XLSX.readxlsx(data_path);
     sh_names = XLSX.sheetnames(xf)
 
@@ -170,6 +172,9 @@ function readSpecMF(modelstr,data_path)
     sh_mat = sh_ref[:]
 
     # Reads the setup sheet
+    if any(sh_mat[1,:].==modelstr)==false
+        error("The model specification '$modelstr' is not a row in $data_path")
+    end
     model_ind = findall(sh_mat[1,:].==modelstr)[1]
     vb_ind = findall(sh_mat[:,1].=="lastRow")[1] + 1;       # where the variables start
     varListA_str = sh_mat[vb_ind:end,1];                    # strings of variables
@@ -184,7 +189,7 @@ function readSpecMF(modelstr,data_path)
 
 
     # Reads the high-frequency
-    datasheetHF_str = "datasheet" * string(sh_mat[sh_mat[:,1].=="datasheet",model_ind][1]) * "_HF";    # the high-frequency datasheet
+    datasheetHF_str = model_sh_name_ident * string(sh_mat[sh_mat[:,1].==model_sh_name_ident,model_ind][1]) * "_HF";    # the high-frequency datasheet
     data_matHF_raw = xf[datasheetHF_str][:];
     dataf_HF_TA = BEAVARs.xlsx2ta(data_matHF_raw)
     varList_HF = intersect(varListF,colnames(dataf_HF_TA));      # looks for which variables are required and which are found
@@ -194,30 +199,34 @@ function readSpecMF(modelstr,data_path)
 
 
     # Reads the low-frequency
-    datasheetLF_str = "datasheet" * string(sh_mat[sh_mat[:,1].=="datasheet",model_ind][1]) * "_LF";    # the low-frequency datasheet
+    datasheetLF_str = model_sh_name_ident * string(sh_mat[sh_mat[:,1].==model_sh_name_ident,model_ind][1]) * "_LF";    # the low-frequency datasheet
     data_matLF_raw = xf[datasheetLF_str][:];
     dataf_LF_TA = BEAVARs.xlsx2ta(data_matLF_raw)
     varList_LF = intersect(varListF,colnames(dataf_LF_TA));      # looks for which variables are required and which are found
     dataLF_TA = dataf_LF_TA[varList_LF];                         # selects the variables found in this TA
 
-    # transHF_vec = Vector{Int}();                                # vector of transformations for the found high-freq. vars
-    # push!(transHF_vec,(trans_dictA[i] for i in varList_HF)...);  # fill it
-    # transHF_vec = getindex.(Ref(trans_dictA),varList_HF);       # vector of transformations for the vars
 
     lf_ta = BEAVARs.TAtrans(dataLF_TA,varList_LF,trans_dictA)
-    
-    return hf_ta, lf_ta, varListF
+    if readCS == false
+        return hf_ta, lf_ta, varListF
+    else 
+        wght_ind = findall(sh_mat[:,1].=="weights")[1]       # where the variables start
+        weights_sh_num_ident = sh_mat[wght_ind,model_ind];
+        weights_tab = BEAVARs.read_spec_weights(weights_sh_name_ident*string(weights_sh_num_ident),data_path);
+        return hf_ta, lf_ta, varListF, weights_tab
+    end
 
 end
+
 
 @doc raw"""
 
 
-    reads weights for time series cross-sectional aggregation from a custom sheet
+    reads weights for cross-sectional aggregation of a time series from a custom sheet
 """
 function read_spec_weights(sheet_name,data_path)
     xf = XLSX.readxlsx(data_path);
-    sh_names = XLSX.sheetnames(xf)
+    # sh_names = XLSX.sheetnames(xf)
     sh_ref = xf[sheet_name];
     sh_mat = sh_ref[:]
     # dates = Date.(Int.(sh_mat[2:end, 1]), 1, 1)
@@ -228,14 +237,20 @@ function read_spec_weights(sheet_name,data_path)
     return ta
 end
 
+"""
+    expand_weights_annual(ta::TimeArray; exp_freq::Symbol = :quarterly)
 
-function expand_weights_annual(ta::TimeArray; frequency::Symbol = :quarterly)
-    months_per_period = if frequency == :quarterly
+    Takes yearly data and interpolates it to quarterly or monthly exp_freq by copying the values within a year.
+    
+    devNote: Consider replacing this with a function from TimeSeries.jl
+"""
+function expand_weights_annual(ta::TimeArray; exp_freq::Symbol = :quarterly)
+    months_per_period = if exp_freq == :quarterly
         3
-    elseif frequency == :monthly
+    elseif exp_freq == :monthly
         1
     else
-        throw(ArgumentError("frequency must be :quarterly or :monthly"))
+        throw(ArgumentError("exp_freq must be :quarterly or :monthly"))
     end
 
     annual_dates = timestamp(ta)
@@ -411,17 +426,35 @@ end
 
 
 
-function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},vintages_names_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},vintages_names_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup; model_sh_name_ident = "datasheet",weights_sh_name_ident="weights")
     n_list = length(model_cols_list);
     vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
     for ii=1:n_list 
         if typeof(model_type) <: BEAVARs.BVARmodelMFType
-            dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpecMF(model_cols_list[ii],file_path);
+            dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpecMF(model_cols_list[ii],file_path, model_sh_name_ident=model_sh_name_ident ,weights_sh_name_ident=weights_sh_name_ident);
             data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab,var_list = varOrder)
         elseif typeof(model_type) <: BEAVARs.BVARmodelSFType
             data_tab, varOrder = BEAVARs.readSpecOF(model_cols_list[ii],file_path);
             data_struct = makeDataSetup(model_type,data_tab,var_list = varOrder)
         end
+        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
+    end
+    return vint_dict
+end
+
+
+"""
+
+
+    A different dispatch for MF models with cross-sectional constraint. var_list/varOrder currently does nothing, has to be worked on
+"""
+function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},model_type::BVARmodelMFType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup, cs_varHF::Symbol; cs_scVal = 1e-7, endog_flag = false,freq_weight_expand=:quarterly,  model_sh_name_ident = "datasheet",weights_sh_name_ident="weights", vintages_names_list = model_cols_list)
+    n_list = length(model_cols_list);
+    vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
+    for ii=1:n_list 
+        dataHF_tab, dataLF_tab, varOrder, weights_tab = BEAVARs.readSpecMF(model_cols_list[ii],file_path,readCS=true, model_sh_name_ident=model_sh_name_ident ,weights_sh_name_ident=weights_sh_name_ident);
+        weightsCS_tab = BEAVARs.expand_weights_annual(weights_tab,exp_freq=freq_weight_expand);
+        data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab, cs_varHF ,weightsCS_tab,cs_scVal=cs_scVal,endog_flag = endog_flag);
         vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
     end
     return vint_dict

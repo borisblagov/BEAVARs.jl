@@ -106,7 +106,7 @@ end
 
 
 @doc raw"""
-    makeM_crossSect(z_cs_tab, var_listLF, dataw_cs_tab, fdataHF_tab, Sm_bit,
+    makeM_crossSect(z_cs_tab, var_listLF, dataCSweights_tab, fdataHF_tab, Sm_bit,
                     prior_RW, nm; scVal=10e-8)
               
     Construct the mapping matrix for a cross-sectional constraint on missing
@@ -116,7 +116,7 @@ end
         $z = M_cs * y^m$
     for a vector of missing data $y^m$. 
         
-    It matches the entries in $z$ with the entries in  $y^m$ using dates in dataw_cs_tab.
+    It matches the entries in $z$ with the entries in  $y^m$ using dates in dataCSweights_tab.
 
     The constraint series must contain exactly one variable. The dates in
     `z_cs_tab` must be present in the weight table.
@@ -125,8 +125,8 @@ end
     - `z_cs_tab`: A one-column `TimeArray` containing the cross-sectional
     constraint observations.
     - `var_listLF`: Names of the high-frequency variables included in the
-    constraint. These names select and order the columns from `dataw_cs_tab`.
-    - `dataw_cs_tab`: A `TimeArray` of cross-sectional weights, indexed by date and
+    constraint. These names select and order the columns from `dataCSweights_tab`.
+    - `dataCSweights_tab`: A `TimeArray` of cross-sectional weights, indexed by date and
     variable.
     - `fdataHF_tab`: The high-frequency data `TimeArray`; its dates and column
     names are used to map variables and observations.
@@ -149,14 +149,14 @@ end
     entries in `Sm_bit` does not equal `nm`, or a constraint date is missing from
     the weight table.
 """
-function makeM_crossSect(z_cs_tab,var_listLF,dataw_cs_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal)
+function makeM_crossSect(z_cs_tab,var_listLF,dataCSweights_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal)
     if size(z_cs_tab,2) ≠ 1
         error("z_cs_tab should have only one variable in it. If you want multiple variabels consider adding another constraint")
     end
 
     YY_dates    = TimeSeries.timestamp(fdataHF_tab);
     fvarNames   = TimeSeries.colnames(fdataHF_tab);
-    weightsCS_tab = dataw_cs_tab[var_listLF];         # weighting matrix ordered by the order in fdataHF_tab. Should contain the variable to be constraint
+    weightsCS_tab = dataCSweights_tab[var_listLF];         # weighting matrix ordered by the order in fdataHF_tab. Should contain the variable to be constraint
     weights_dates = TimeSeries.timestamp(weightsCS_tab);
     varNamesCS  = var_listLF                        # variable names of the unobserved variables that will be constrained
     T_z_cs      = size(z_cs_tab,1)                   # Observations of the cross-sectional constraint
@@ -378,7 +378,7 @@ function make_mf_constraints_old(set_struct,data_struct)
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp, show_prog = set_struct
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
     if typeof(data_struct) <: BEAVARs.BVARmodelDataSetup_MFcs
-       @unpack z_cs_tab, dataw_cs_tab, var_list, cs_scVal = data_struct
+       @unpack z_cs_tab, dataCSweights_tab, var_list, cs_scVal = data_struct
     end
 
     varNamesLF = Vector{Symbol}(colnames(dataLF_tab))
@@ -434,7 +434,7 @@ function make_mf_constraints_old(set_struct,data_struct)
 
     M_inter, z_inter_vec, T_z_inter, O_inter= BEAVARs.makeM_intertemp(z_inter_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf);
     if typeof(data_struct)<:BEAVARs.BVARmodelDataSetup_MFcs
-        M_cs, z_cs_vec,T_z_cs, O_cs = BEAVARs.makeM_crossSect(z_cs_tab,varNamesLF,dataw_cs_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal);
+        M_cs, z_cs_vec,T_z_cs, O_cs = BEAVARs.makeM_crossSect(z_cs_tab,varNamesLF,dataCSweights_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal);
 
         M_z = [M_inter; M_cs];
         z_vec = [z_inter_vec; z_cs_vec];
@@ -467,7 +467,7 @@ function make_mf_constraints(set_struct,data_struct)
     @unpack p, n_burn,n_save, const_loc, n_fcst, prior_RW, est_hyp, show_prog = set_struct
     @unpack dataHF_tab,dataLF_tab, var_list = data_struct
     if typeof(data_struct) <: BEAVARs.BVARmodelDataSetup_MFcs
-       @unpack z_cs_tab, dataw_cs_tab, cs_scVal = data_struct
+       @unpack z_cs_tab, dataCSweights_tab, cs_scVal = data_struct
     end
 
     fdataHF_tab, z_inter_tab, freq_mix_tp, fdatesLF, fdatesHF, datesHF, datesLF, varNamesLF, fvarNames, HF_n_fcst, M_inter_agg = BEAVARs.init_MF_TimeArrays(dataLF_tab,dataHF_tab,var_list,prior_RW,n_fcst)
@@ -478,7 +478,7 @@ function make_mf_constraints(set_struct,data_struct)
 
     M_inter, z_inter_vec, T_z_inter, O_inter= BEAVARs.makeM_intertemp(z_inter_tab,Sm_bit,datesHF,varNamesLF,fvarNames,freq_mix_tp,Tf);
     if typeof(data_struct)<:BEAVARs.BVARmodelDataSetup_MFcs
-        M_cs, z_cs_vec,T_z_cs, O_cs = BEAVARs.makeM_crossSect(z_cs_tab,varNamesLF,dataw_cs_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal);
+        M_cs, z_cs_vec,T_z_cs, O_cs = BEAVARs.makeM_crossSect(z_cs_tab,varNamesLF,dataCSweights_tab,fdataHF_tab,Sm_bit,prior_RW,nm,cs_scVal);
 
         M_z = [M_inter; M_cs];
         z_vec = [z_inter_vec; z_cs_vec];
@@ -504,12 +504,12 @@ function check_cs_constraint(out_struct,set_struct,data_struct)
         error("you can only check the cross-sectional constraint for a model with such a constraint")
     end
     @unpack prior_RW = set_struct;
-    @unpack dataw_cs_tab, z_cs_tab = data_struct;
+    @unpack dataCSweights_tab, z_cs_tab = data_struct;
     @unpack YYforHF_struct = out_struct;
-    varNames_LF = colnames(dataw_cs_tab);
+    varNames_LF = colnames(dataCSweights_tab);
     if prior_RW == 0
         # a1 = TimeSeries.values(out_struct.YYforHF_struct.YYfor_med_tab[:gdpNRW, :gdpDEoNRW]) 
-        a2 = values(dataw_cs_tab[ TimeSeries.timestamp(YYforHF_struct.YYfor_med_tab[varNames_LF])])
+        a2 = values(dataCSweights_tab[ TimeSeries.timestamp(YYforHF_struct.YYfor_med_tab[varNames_LF])])
         sum_out_tab = sum(YYforHF_struct.YYfor_med_tab[varNames_LF].*a2,dims=2)
         plot(sum_out_tab)
         plot!(z_cs_tab)
@@ -517,7 +517,7 @@ function check_cs_constraint(out_struct,set_struct,data_struct)
     elseif prior_RW== 1
         YYfor_med_pc_tab = diff(YYforHF_struct.YYfor_med_tab[varNames_LF]);
         YYfor_med_pc_dates = timestamp(YYfor_med_pc_tab);
-        a2 = values(dataw_cs_tab[YYfor_med_pc_dates])
+        a2 = values(dataCSweights_tab[YYfor_med_pc_dates])
         sum_out_tab = sum(YYfor_med_pc_tab.*a2,dims=2)
         plot(sum_out_tab)
         plot!(z_cs_tab[YYfor_med_pc_dates])
@@ -525,3 +525,25 @@ function check_cs_constraint(out_struct,set_struct,data_struct)
     end
     return both_sum_z_tab
 end
+
+
+
+"""
+    makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, cs_varHF::Symbol, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
+
+
+
+"""
+function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, cs_varHF::Symbol, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
+    # if endog_flag == false
+        z_cs_tab = dataHF_tab[:,cs_varHF]   # generate the z matrix (a vector with one variable)
+    # else
+    #     z_cs_tab = dataHF_tab[:,cs_varHF]   # generate the z matrix (a vector with one variable)
+    #     dataHF_tab = dataHF_tab[filter(!=(cs_varHF), colnames(dataHF_tab))]  # remove it from the HF data
+    # end
+    var_listHF = colnames(dataHF_tab);
+    var_listLF = colnames(dataLF_tab);
+    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
+end
+
+

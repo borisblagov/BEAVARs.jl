@@ -129,8 +129,10 @@ See also `makeDataSetup`.
     dataHF_tab::TimeArray{T,N1,D,A1}                        # data for the high-frequency variables
     dataLF_tab::TimeArray{T,N2,D,A2}                        # data for the low-frequency variables
     z_cs_tab::TimeArray{T,N3,D,A3}                          # observations for cross-sectional constraint
-    dataw_cs_tab::TimeArray{T,N4,D,A4}                      # weights for the low-frequency variables that sum on each row to 1
+    dataCSweights_tab::TimeArray{T,N4,D,A4}                      # weights for the low-frequency variables that sum on each row to 1
     var_list::Vector{Symbol}                                # Symbol vector with the variable names, will be used for ordering
+    var_listHF::Vector{Symbol}
+    var_listLF::Vector{Symbol}
     cs_scVal;                                               # error tolerance for the cross-sectional constraint
     endog_flag::Bool    
 end
@@ -152,7 +154,7 @@ See also `makeDataSetup`.
 @with_kw struct data_MFVAR_2f{T <: AbstractFloat, N1, D, A1 <: AbstractArray{T, N1}, N2, A2 <: AbstractArray{T, N2}} <: BVARmodelDataSetup_MF
     dataHF_tab::TimeArray{T,N1,D,A1}                                       # data for the high-frequency variables
     dataLF_tab::TimeArray{T,N2,D,A2}                                       # data for the low-frequency variables
-    var_list::Vector{Symbol}                                   # Symbol vector with the variable names, will be used for ordering
+    var_list::Vector{Symbol}                                   # Symbol vector with the variable names, will be used for ordering}
 end
 
 
@@ -275,10 +277,6 @@ end
 
 function unpackLoopSetup(loop_struct::BVARmodelLoopSetup)
     @unpack model_type, set_struct, hyp_struct, data_struct,  = loop_struct 
-    # model_type = model;
-    # set_struct = set_struct;
-    # hyp_struct = hyp_struct;
-    # data_struct = data_struct;
     return model_type, set_struct, hyp_struct, data_struct
 end
 
@@ -344,7 +342,7 @@ include("BGR2010.jl")
 """
 function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
-    fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
+    # fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
     for (index, value) in pairs(vint_in_dict)
         # println("$index $value")
         println("Estimating data vintage $index")

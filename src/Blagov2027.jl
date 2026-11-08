@@ -48,12 +48,12 @@ function beavar(::Blagov2027_type, set_struct::BVARmodelSetup, hyp_struct::BVARm
 end
 
 
-# # Structure for the datasets and the frequency mix
+#  # Structure for the datasets and the frequency mix
 # @doc raw"""
 #     dataBlagov2027(data_HF::TimeArray,data_LF::TimeArray,prior_RW::Int,var_list::Array{Symbol,1})
 #
 # generate a dataset strcture for use with Blagov2027 model
-# # Arguments
+#  # Arguments
 #     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
 #     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
 #     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
@@ -77,7 +77,7 @@ end
 
 
 @doc raw"""
-    makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataw_cs_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7)
+    makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7)
 
     Create the data structure for a two-frequency mixed-frequency VAR with an
     exogenous cross-sectional constraint.
@@ -90,7 +90,7 @@ end
 - `z_cs_tab`: A one-column `TimeArray` of exogenous observations defining the
   cross-sectional constraint. Each observation is matched by date to a
   weighted combination of the corresponding high-frequency series.
-- `dataw_cs_tab`: A `TimeArray` of cross-sectional weights. Its columns
+- `dataCSweights_tab`: A `TimeArray` of cross-sectional weights. Its columns
   correspond to the variables being aggregated (the relevant low-frequency
   variables and their high-frequency series), and its dates must cover the
   dates in `z_cs_tab`.
@@ -108,8 +108,11 @@ end
 A `data_MFVAR_crossSect` data structure containing the supplied data,
 variable ordering, and cross-sectional constraint error scale.
 """
-function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataw_cs_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
-    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataw_cs_tab, var_list, cs_scVal,endog_flag)
+function makeDataSetup(::Blagov2027_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
+    
+    var_listHF = colnames(dataHF_tab);
+    var_listLF = colnames(dataLF_tab);
+    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
 end
 
 
