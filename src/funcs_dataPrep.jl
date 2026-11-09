@@ -210,7 +210,10 @@ function readSpecMF(modelstr,data_path; model_sh_name_ident = "datasheet",weight
     if readCS == false
         return hf_ta, lf_ta, varListF
     else 
-        wght_ind = findall(sh_mat[:,1].=="weights")[1]       # where the variables start
+        if isempty(findall(sh_mat[:,1].=="weightssheet"))
+            error("The row `weightssheet` cannot be found in the `setup` sheet of $data_path file.")
+        end
+        wght_ind = findall(sh_mat[:,1].=="weightssheet")[1]       # where the variables start
         weights_sh_num_ident = sh_mat[wght_ind,model_ind];
         weights_tab = BEAVARs.read_spec_weights(weights_sh_name_ident*string(weights_sh_num_ident),data_path);
         return hf_ta, lf_ta, varListF, weights_tab

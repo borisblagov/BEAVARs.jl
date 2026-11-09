@@ -152,9 +152,8 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
     store_c1    = zeros(n_save,);
     store_c2    = zeros(n_save,);
             
-    if show_prog == true
-        progress_bar = Progress(ndraws; dt=1.0)
-    end
+    
+    progress_bar = Progress(ndraws; dt=1.0,enabled = show_prog)
     
     for ii = 1:ndraws
     
