@@ -37,7 +37,7 @@ BEAVARs.ols(Y,X)
 ```
 
 ```@docs
-mlag(Yfull::Matrix{Float64},p::Integer)
+BEAVARs.mlag(Yfull::Matrix{Float64},p::Integer)
 ```
 
 ```@docs
@@ -45,7 +45,7 @@ BEAVARs.trainPriors(Z0::Matrix{Float64},p::Int64)
 ```
 
 ```@docs
-percentile_mat(A, p; dims)
+BEAVARs.percentile_mat(A, p; dims)
 ```
 
 
