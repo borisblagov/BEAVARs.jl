@@ -131,8 +131,8 @@ See also `makeDataSetup`.
     z_cs_tab::TimeArray{T,N3,D,A3}                          # observations for cross-sectional constraint
     dataCSweights_tab::TimeArray{T,N4,D,A4}                      # weights for the low-frequency variables that sum on each row to 1
     var_list::Vector{Symbol}                                # Symbol vector with the variable names, will be used for ordering
-    var_listHF::Vector{Symbol}
-    var_listLF::Vector{Symbol}
+    var_listHF::Vector{Symbol}                              # Symbol vector with the high-frequency variables
+    var_listLF::Vector{Symbol}                              # Symbol vector with the high-frequency variables
     cs_scVal;                                               # error tolerance for the cross-sectional constraint
     endog_flag::Bool    
 end
@@ -152,9 +152,11 @@ Generate a dataset strcture for use with CPZ2023 model
 See also `makeDataSetup`.
 """
 @with_kw struct data_MFVAR_2f{T <: AbstractFloat, N1, D, A1 <: AbstractArray{T, N1}, N2, A2 <: AbstractArray{T, N2}} <: BVARmodelDataSetup_MF
-    dataHF_tab::TimeArray{T,N1,D,A1}                                       # data for the high-frequency variables
-    dataLF_tab::TimeArray{T,N2,D,A2}                                       # data for the low-frequency variables
-    var_list::Vector{Symbol}                                   # Symbol vector with the variable names, will be used for ordering}
+    dataHF_tab::TimeArray{T,N1,D,A1}                        # data for the high-frequency variables
+    dataLF_tab::TimeArray{T,N2,D,A2}                        # data for the low-frequency variables
+    var_list::Vector{Symbol}                                # Symbol vector with the variable names, will be used for ordering}
+    var_listHF::Vector{Symbol}                              # Symbol vector with the high-frequency variables
+    var_listLF::Vector{Symbol}                              # Symbol vector with the high-frequency variables
 end
 
 

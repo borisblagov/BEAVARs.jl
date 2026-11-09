@@ -616,3 +616,96 @@ function remove_nan_padding(A)
     # Return the trimmed matrix containing rows 1 to N
     return A[1:N, :]
 end
+
+
+@doc raw"""
+    dropvars(list::Vector{Symbol}, vars_to_remove)
+
+Drops variables from a list of symbols. 
+Inputs should be a tuple or a vector of symbols.
+
+# Examples
+
+## 1. Example with tuples:
+```
+sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+BEAVARs.dropvars(sym_list, (:apple, :cherry))
+```
+
+```
+julia> sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+5-element Vector{Symbol}:
+:apple
+:banana
+:cherry
+:date
+:elderberry
+
+julia> BEAVARs.dropvars(sym_list, (:apple, :cherry))
+3-element Vector{Symbol}:
+:banana
+:date
+:elderberry
+```
+
+## 2. Example with an array
+    ```
+sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+BEAVARs.dropvars(sym_list, [:apple, :cherry])
+```
+
+```
+julia> sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+5-element Vector{Symbol}:
+:apple
+:banana
+:cherry
+:date
+:elderberry
+
+julia> BEAVARs.dropvars(sym_list, [:apple, :cherry])
+3-element Vector{Symbol}:
+:banana
+:date
+:elderberry
+    ```
+
+"""
+function dropvars(list::Vector{Symbol}, vars_to_remove)
+    return filter!(x -> x ∉ vars_to_remove, list)
+end
+
+"""
+    dropvars(list::Vector{Symbol}, var_to_remove::Symbol)
+
+Drops variables from a list of symbols. 
+Inputs should be a symbol, e.g. :varname.
+
+# Example
+
+```
+sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+BEAVARs.dropvars(sym_list, :cherry)
+```
+
+```
+julia> sym_list = [:apple, :banana, :cherry, :date, :elderberry]
+5-element Vector{Symbol}:
+:apple
+:banana
+:cherry
+:date
+:elderberry
+
+julia> BEAVARs.dropvars(sym_list, :cherry)
+4-element Vector{Symbol}:
+:apple
+:banana
+:date
+:elderberry
+```
+"""
+function dropvars(list::Vector{Symbol}, var_to_remove::Symbol)
+    return filter!(x -> x !== var_to_remove, list)
+end
+

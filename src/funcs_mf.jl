@@ -531,7 +531,35 @@ end
 """
     makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, cs_varHF::Symbol, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
 
+    Create the data structure for a two-frequency mixed-frequency VAR with a cross-sectional constraint.
 
+    Takes a variable from `dataHF_tab` given in `cs_varHF` to form the observations of the constraint `z_cs_tab`. 
+    There is another implementation of the function that takes `z_cs_tab` directly.
+
+# Arguments
+- A model type that is subset of ::BVARmodelMFType. Check with `typeof(model_type)<:BEAVARs.BVARmodelMFType`
+- `dataHF_tab`: A `TimeArray` containing the high-frequency observations, monthly or quarterly data.
+- `dataLF_tab`: A `TimeArray` containing the low-frequency observations, quarterly or annual data.
+- `cs_varHF`: A symbol with the variable in dataHF_tab tha you want to use as observations in the constraint. 
+  Each observation is matched by date to a weighted combination of the corresponding high-frequency series.
+- `dataCSweights_tab`: A `TimeArray` of cross-sectional weights. Its columns
+  correspond to the variables being aggregated (the relevant low-frequency variables), and its dates must cover the
+  dates in `z_cs_tab`.
+- `var_list`: The variable ordering used by the model. Defaults to the
+  high-frequency variable names followed by the low-frequency variable names. 
+  You can use this also to drop specific variables for testing, see the function BEAVARs.dropbvars()
+- `cs_scVal`: Error tolerance for the cross-sectional constraint, used as the
+  diagonal error variance for its observations. Smaller values enforce the
+  constraint more tightly; the default is `1e-7`. If your data is in percentage points like  
+  percentage changes you might get oscillations if you set it too tight (1e-4 to 1e-6  seems to work well). 
+  Best have your data in decimals instead of percentage points.
+  If you enfore a constraint in log-levels using data in decimal growth rates (as you should)
+  you might need it tighter, e.g. `1e-8`. The default is in the middle somewhat.
+- `endog_flat`: currently not implemented, defaults to false.
+
+# Returns
+A `data_MFVAR_crossSect` data structure containing the supplied data,
+variable ordering, and cross-sectional constraint error scale.
 
 """
 function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, cs_varHF::Symbol, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
@@ -546,4 +574,58 @@ function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::Time
     return data_MFVAR_crossSect(dataHF_tab[:,var_listHF], dataLF_tab[:,var_listLF], z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
 end
 
+
+
+@doc raw"""
+    makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7)
+
+    Create the data structure for a two-frequency mixed-frequency VAR with a cross-sectional constraint.
+
+    Takes the observations of the constraint as a third input: `z_cs_tab`. There is another implementation of the function that
+    takes a symbol for a variable from dataHF_tab and copies that data to create a z_cs_tab.
+
+# Arguments
+- A model type that is subset of ::BVARmodelMFType. Check with `typeof(model_type)<:BEAVARs.BVARmodelMFType`
+- `dataHF_tab`: A `TimeArray` containing the high-frequency observations, monthly or quarterly data.
+- `dataLF_tab`: A `TimeArray` containing the low-frequency observations, quarterly or annual data.
+- `z_cs_tab`: A one-column `TimeArray` of exogenous observations defining the
+  cross-sectional constraint. Each observation is matched by date to a
+  weighted combination of the corresponding high-frequency series.
+- `dataCSweights_tab`: A `TimeArray` of cross-sectional weights. Its columns
+  correspond to the variables being aggregated (the relevant low-frequency variables), and its dates must cover the
+  dates in `z_cs_tab`.
+- `var_list`: The variable ordering used by the model. Defaults to the
+  high-frequency variable names followed by the low-frequency variable names. 
+  You can use this also to drop specific variables for testing, see the function BEAVARs.dropbvars()
+- `cs_scVal`: Error tolerance for the cross-sectional constraint, used as the
+  diagonal error variance for its observations. Smaller values enforce the
+  constraint more tightly; the default is `1e-7`. If your data is in percentage points like  
+  percentage changes you might get oscillations if you set it too tight (1e-4 to 1e-6  seems to work well). 
+  Best have your data in decimals instead of percentage points.
+  If you enfore a constraint in log-levels using data in decimal growth rates (as you should)
+  you might need it tighter, e.g. `1e-8`. The default is in the middle somewhat.
+- `endog_flat`: currently not implemented, defaults to false.
+
+# Returns
+A `data_MFVAR_crossSect` data structure containing the supplied data,
+variable ordering, and cross-sectional constraint error scale.
+"""
+function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray, z_cs_tab::TimeArray, dataCSweights_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)], cs_scVal = 1e-7, endog_flag = false)
+    var_listHF = intersect(var_list,colnames(dataHF_tab));
+    var_listLF = intersect(var_list,colnames(dataLF_tab));
+    return data_MFVAR_crossSect(dataHF_tab[:,var_listHF], dataLF_tab[:,var_listLF], z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
+end
+
+
+
+@doc raw"""
+    makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+
+    Generate the data structure containg for the mixed-frequency VAR for a two-frequency MF-VAR model with intertemporal constraints only.
+"""
+function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+    var_listHF = intersect(var_list,colnames(dataHF_tab));
+    var_listLF = intersect(var_list,colnames(dataLF_tab));
+    return data_MFVAR_2f(dataHF_tab[:,var_listHF], dataLF_tab[:,var_listLF], var_list, var_listHF,var_listLF)
+end
 

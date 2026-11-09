@@ -87,22 +87,23 @@ function CPZ2023(dataHF_tab::TimeArray{Typ,N,D,A},dataLF_tab::TimeArray{Typ,N,D,
 end
 
 
-# Data functions
-@doc raw"""
-    makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
+# # Data functions
+# this function is superseeded by makeDataSetup(::BVARmodelMFvartype,...)
+# @doc raw"""
+#     makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataHF_tab); colnames(dataLF_tab)])
 
-Generate data for a mixed-frequency VAR. Uses Time Arrays from the TimeSeries package
+# Generate data for a mixed-frequency VAR. Uses Time Arrays from the TimeSeries package
     
-# Arguments
-    dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
-    dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
-    var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
+# # Arguments
+#     dataHF_tab: TimeArray with your high-frequency variables (monthly or quarterly, respectively)
+#     dataLF_tab: TimeArray with your low-frequency variables (quarterly or yearly, respectively)
+#     var_list:   the variable order. Note that the functions that call these variables allow this to be optional.
 
 
-"""
-function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
-    return data_MFVAR_2f(dataHF_tab, dataLF_tab, var_list)
-end
+# """
+# function makeDataSetup(::CPZ2023_type,dataHF_tab::TimeArray, dataLF_tab::TimeArray; var_list =  [colnames(dataLF_tab); colnames(dataHF_tab)])
+#     return data_MFVAR_2f(dataHF_tab, dataLF_tab, var_list)
+# end
 
 
 
