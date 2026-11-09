@@ -16,23 +16,10 @@ using   LinearAlgebra,
         PrettyTables,
         LaTeXStrings
 
-# from init_functions.jl
-export mlag, mlagL, mlagL!, percentile_mat
-
-# from Banbura, Giannone, Reichling 2010
-#export makeDummiesMinn!, makeDummiesSumOfCoeff!, getBeta!, getSigma!, gibbs_beta_sigma,trainPriors, BGR2010, hypBGR2010
-
-# from irfs.jl
-export irf_chol, irf_chol_overDraws, irf_chol_overDraws_csv
 
 export hypChan2020, hypBGR2010
 
 export beavar, beavars, beavars_weave, makeOutput, makeSetup, makeHypSetup, makeDataSetup, LoopSetup
-
-# Structures, to be uncommented later
-# export BVARmodelSetup, BVARmodelOutput, Chan2020csv_type, Chan2020minn_type, BVARmodelHypSetup, hypDefault_struct, outChan2020csv, BVARModelType, VARSetup
-
-
 
 
 # Types for multiple dispatch across models
@@ -97,11 +84,11 @@ end
 @doc raw"""
     
 """
-@with_kw struct LoopSetup <: BVARmodelLoopSetup
-    model_type::BVARmodelType
-    set_struct::BVARmodelSetup
-    hyp_struct::BVARmodelHypSetup
-    data_struct::BVARmodelDataSetup
+@with_kw struct LoopSetup{MT<:BVARmodelType,SS<:BVARmodelSetup,HS<:BVARmodelHypSetup,DS<:BVARmodelDataSetup} <: BVARmodelLoopSetup
+    model_type::MT
+    set_struct::SS
+    hyp_struct::HS
+    data_struct::DS
 end
 
 

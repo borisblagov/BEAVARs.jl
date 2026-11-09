@@ -426,7 +426,7 @@ end
 
 
 
-function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},vintages_names_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup; model_sh_name_ident = "datasheet",weights_sh_name_ident="weights")
+function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup; model_sh_name_ident = "datasheet",weights_sh_name_ident="weights", vintages_names_list = model_cols_list)
     n_list = length(model_cols_list);
     vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
     for ii=1:n_list 

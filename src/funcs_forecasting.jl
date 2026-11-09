@@ -17,6 +17,13 @@ struct eval_vint_CPZ2023{T <: AbstractFloat, N} <: BVARmodelEval
 end
 
 
+function _eval_percentchange(ta::TimeArray{T,N,D,A}) where {T<:AbstractFloat,N,D,A<:AbstractArray{T,N}}
+    log_values = log.(values(ta))
+    changes = expm1.(diff(log_values; dims=1))
+    return TimeArray(ta; timestamp=timestamp(ta)[2:end], values=changes)
+end
+
+
 
 
 
@@ -39,16 +46,19 @@ end
         - BEAVARs.pred_lik_CCM() for calculating the predictive likelihood as in Carriero et al 2013 JAE
 
 """
-function eval_forecast(out_struct::BVARmodelOutput, data_struct::BVARmodelDataSetup, set_struct::BVARmodelSetup, dataLF_true_ftab::TimeArray)  
-    @unpack fdatesLF,store_YY_LF,freq_mix_tp = out_struct;  
-    @unpack dataLF_tab, var_list = data_struct
-    @unpack n_fcst, p, n_save = set_struct
+function eval_forecast(out_struct::O, data_struct::DS, set_struct::SS, dataLF_true_ftab::TA) where {O<:BVARmodelOutput,DS<:BVARmodelDataSetup,SS<:BVARmodelSetup,TA<:TimeArray}
+    fdatesLF = out_struct.fdatesLF
+    store_YY_LF = out_struct.store_YY_LF
+    freq_mix_tp = out_struct.freq_mix_tp
+    dataLF_tab = data_struct.dataLF_tab
+    var_list = data_struct.var_list
+    n_fcst = set_struct.n_fcst
 
     # check if we are working in levels to transform the true data to growth rates for evaluation
     if freq_mix_tp[3] == 1
-        dataLF_tab = percentchange(dataLF_tab);
-        dataLF_true_ftab = percentchange(dataLF_true_ftab);
-        fdatesLF = out_struct.fdatesLF[2:end];              # we lose the first date when we take growth rates, so we need to adjust the forecast dates accordingly
+        dataLF_tab = _eval_percentchange(dataLF_tab)
+        dataLF_true_ftab = _eval_percentchange(dataLF_true_ftab)
+        fdatesLF = fdatesLF[2:end]              # discard the first date when taking growth rates
         store_YY_LF = out_struct.store_YY_LF[2:end,:,:]./out_struct.store_YY_LF[1:end-1,:,:].-1;
     end
 
@@ -67,8 +77,13 @@ function eval_forecast(out_struct::BVARmodelOutput, data_struct::BVARmodelDataSe
     fcast_errors_mAd_mat = fill(NaN,(n_fcst,n_fvar));   # houses the forecast error for each evaluated variable and forecast horizon, mean over all draws
 
 
-    if allequal(eachcol(no_nan_flag_mat))
-        locs = [findfirst(==(s), var_list) for s in var_list_true]
+    if allequal(eachcol(no_nan_flag_mat)) === true
+        locs = Vector{Int}(undef, length(var_list_true))
+        for (i, s) in pairs(var_list_true)
+            loc = findfirst(==(s), var_list)
+            loc === nothing && throw(ArgumentError("Evaluation variable $s is not present in the model data"))
+            locs[i] = loc
+        end
         obs_datesLF = datesLF[no_nan_flag_mat[:,1]];                    # dates for which we have obs, everthing else is forecast, we may simply take the first column as we checked they are all equal
         fcast_flags = fdatesLF .∉  Ref(obs_datesLF);                    # indicate which values in store_YYlf of variable i are forecasts based on the data in dataLF_tab
         fcast_datesLF = fdatesLF[fcast_flags];                          # corresponding dates 
@@ -82,7 +97,6 @@ function eval_forecast(out_struct::BVARmodelOutput, data_struct::BVARmodelDataSe
 
         # these are the relevant forecasts
         fcast_YY =  @view store_YY_LF[fcastDatesOverlap_BitVec,locs,:]
-        fcast_YY_mat = dropdims(mean(fcast_YY,dims=3),dims=3);
         fcast_errors_mat = data_true_VecView .- fcast_YY
 
         fcast_errors_mAd_mat[1:size(fcast_errors_mat,1),:] = dropdims(mean(fcast_errors_mat,dims=3),dims=3);   # mean forecast error across draws
@@ -91,6 +105,7 @@ function eval_forecast(out_struct::BVARmodelOutput, data_struct::BVARmodelDataSe
         pred_lik_mat[1:size(fcast_errors_mat,1),:] = BEAVARs.pred_lik_CCM(fcast_YY,data_true_VecView)
         
     else
+        throw(ArgumentError("Forecast evaluation currently requires balanced low-frequency data"))
         # TODO finish this for the case where the dataLF_tab is unbalanced
         # for i_var = 1:n_fvar
         #     i_var_sym = var_list_true[i_var];                               # symbol of the variable for which we will evaluate
@@ -135,14 +150,13 @@ end
 
 
 """
-    beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+    beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,<:BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,<:BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
 
     Prepare the forecasts for evaluation. Only the variables that are in dataLF_true_ftab will be evaluated. 
         They need to all be present.
 """
-function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmodelOutput}, vint_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}, dataLF_true_ftab::TimeArray)
+function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,O}, vint_dict::ThreadSafeDict{String,S}, dataLF_true_ftab::TimeArray;ks      = collect(keys(vint_out_dict))) where {O<:BEAVARs.BVARmodelOutput,S<:BEAVARs.BVARmodelLoopSetup}
     eval_vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelEval}()
-    ks      = collect(keys(vint_out_dict))
     n_eval  = length(ks)
     n_fcast = vint_dict[ks[1]].set_struct.n_fcst;
     varEval_list = colnames(dataLF_true_ftab);
@@ -176,6 +190,7 @@ function beavars_prep_eval(vint_out_dict::ThreadSafeDict{String,BEAVARs.BVARmode
 
     return toEval_struct, eval_vint_dict
 end
+
 
 """
     eval_forecasts(eval_struct; drop_dates = Date[])
