@@ -429,6 +429,8 @@ end
 function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String, 1},model_type::BVARmodelType,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup; model_sh_name_ident = "datasheet",weights_sh_name_ident="weights", vintages_names_list = model_cols_list)
     n_list = length(model_cols_list);
     vint_dict = ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}()
+    prog_bar_dicts = Progress(n_list; dt=1.0, desc="Creating vintages...", color=:purple)   # minimum update interval: 1 second
+    
     for ii=1:n_list 
         if typeof(model_type) <: BEAVARs.BVARmodelMFType
             dataHF_tab, dataLF_tab, varOrder = BEAVARs.readSpecMF(model_cols_list[ii],file_path, model_sh_name_ident=model_sh_name_ident ,weights_sh_name_ident=weights_sh_name_ident);
@@ -437,8 +439,10 @@ function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String
             data_tab, varOrder = BEAVARs.readSpecOF(model_cols_list[ii],file_path);
             data_struct = makeDataSetup(model_type,data_tab,var_list = varOrder)
         end
-        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
+        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,deepcopy(set_struct),deepcopy(hyp_struct),deepcopy(data_struct))     
+        next!(prog_bar_dicts)
     end
+    finish!(prog_bar_dicts)
     return vint_dict
 end
 
@@ -455,7 +459,7 @@ function make_vintages_dict_loop(file_path::String,model_cols_list::Array{String
         dataHF_tab, dataLF_tab, varOrder, weights_tab = BEAVARs.readSpecMF(model_cols_list[ii],file_path,readCS=true, model_sh_name_ident=model_sh_name_ident ,weights_sh_name_ident=weights_sh_name_ident);
         weightsCS_tab = BEAVARs.expand_weights_annual(weights_tab,exp_freq=freq_weight_expand);
         data_struct = makeDataSetup(model_type,dataHF_tab, dataLF_tab, cs_varHF ,weightsCS_tab,cs_scVal=cs_scVal,endog_flag = endog_flag);
-        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,set_struct,hyp_struct,data_struct)     
+        vint_dict[vintages_names_list[ii]] = LoopSetup(model_type,deepcopy(set_struct),deepcopy(hyp_struct),deepcopy(data_struct))     
     end
     return vint_dict
 end
