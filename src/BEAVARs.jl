@@ -327,12 +327,17 @@ include("BGR2010.jl")
 """
     beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
 
-    
+Serial version of a function to estimate VAR models across different specifications/vintages.
+Useful when one of your vintages leads to errors and you have no idea which one fails.
+
+See also `beavars_weave`
 """
 function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     vint_out_dict = ThreadSafeDict{String,BEAVARs.BVARmodelOutput}()
     # fcast_out_dict = ThreadSafeDict{String,BEAVARs.BVARforecastOutput}()
-    for (index, value) in pairs(vint_in_dict)
+    prog_bar = Progress(length(vint_in_dict); dt=1.0, desc="Parallel execution of the vintages estimation...",barglyphs=BarGlyphs("[=> ]"), color=:blue)   # minimum update interval: 1 second
+    
+    @showprogress for (index, value) in pairs(vint_in_dict)
         # println("$index $value")
         println("Estimating data vintage $index")
         model_type, set_struct, hyp_struct, data_struct = BEAVARs.unpackLoopSetup(value);
@@ -343,13 +348,14 @@ function beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup}
     end
     
     # return vint_out_dict, fcast_out_dict
+    finish!(prog_bar)
     return vint_out_dict
 end
 
 
 
 """
-    beavars(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+        beavars_weave_dep(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
 
 
         The parallel alternative to beavars function. Should be depreciated as another one is implemented
@@ -377,21 +383,26 @@ function beavars_weave_dep(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodel
 end
 
 """
-    beavars_weave_new(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
+    beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
 
+Parallel function to estimate VAR models across different specifications/vintages.
+There is a serial version called beavers that can also be useful if one of your model fails but you don't know which one.
 
+See also `beavars`
 
 """
 function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoopSetup})
     jobs = [(key, vint_in_dict[key]) for key in keys(vint_in_dict)]
-    results_vec = Vector{Tuple{String, BEAVARs.BVARmodelOutput}}(undef, length(jobs))
+    njobs = length(jobs);
+    results_vec = Vector{Tuple{String, BEAVARs.BVARmodelOutput}}(undef, njobs)
 
+    prog_bar_weave = Progress(njobs; dt=1.0, desc="Parallel execution of the vintages estimation...",barglyphs=BarGlyphs("[=> ]"), color=:blue)   # minimum update interval: 1 second
     Threads.@threads :greedy for i in eachindex(jobs)
         key, loop_setup = jobs[i]
         model_type, set_struct, hyp_struct, data_struct =
             BEAVARs.unpackLoopSetup(loop_setup)
-
         output = BEAVARs.beavar(model_type, set_struct, hyp_struct, data_struct)
+        update!(prog_bar_weave,i)
         results_vec[i] = (key, output)
     end
 
@@ -399,7 +410,7 @@ function beavars_weave(vint_in_dict::ThreadSafeDict{String,BEAVARs.BVARmodelLoop
     for (key, output) in results_vec
         vint_out_dict[key] = output
     end
-    
+    finish!(prog_bar_weave)
     # return vint_out_dict, fcast_out_dict
     return vint_out_dict
 end
