@@ -541,9 +541,9 @@ function makeDataSetup(::BVARmodelMFType,dataHF_tab::TimeArray, dataLF_tab::Time
     #     z_cs_tab = dataHF_tab[:,cs_varHF]   # generate the z matrix (a vector with one variable)
     #     dataHF_tab = dataHF_tab[filter(!=(cs_varHF), colnames(dataHF_tab))]  # remove it from the HF data
     # end
-    var_listHF = colnames(dataHF_tab);
-    var_listLF = colnames(dataLF_tab);
-    return data_MFVAR_crossSect(dataHF_tab, dataLF_tab, z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
+    var_listHF = intersect(var_list,colnames(dataHF_tab));
+    var_listLF = intersect(var_list,colnames(dataLF_tab));
+    return data_MFVAR_crossSect(dataHF_tab[:,var_listHF], dataLF_tab[:,var_listLF], z_cs_tab, dataCSweights_tab, var_list, var_listHF, var_listLF, cs_scVal,endog_flag)
 end
 
 
