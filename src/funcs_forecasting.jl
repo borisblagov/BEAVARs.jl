@@ -23,7 +23,11 @@ function _eval_percentchange(ta::TimeArray{T,N,D,A}) where {T<:AbstractFloat,N,D
     return TimeArray(ta; timestamp=timestamp(ta)[2:end], values=changes)
 end
 
-
+function _eval_diff(ta::TimeArray{T,N,D,A}) where {T<:AbstractFloat,N,D,A<:AbstractArray{T,N}}
+    log_values = values(ta)
+    changes = diff(log_values; dims=1)
+    return TimeArray(ta; timestamp=timestamp(ta)[2:end], values=changes)
+end
 
 
 
@@ -54,15 +58,17 @@ function eval_forecast(out_struct::O, data_struct::DS, set_struct::SS, dataLF_tr
     var_list = data_struct.var_list
     n_fcst = set_struct.n_fcst
 
-    # check if we are working in levels to transform the true data to growth rates for evaluation
+    # check if we are working in log-levels to transform the true data to growth rates for evaluation
     if freq_mix_tp[3] == 1
-        dataLF_tab = _eval_percentchange(dataLF_tab)
-        dataLF_true_ftab = _eval_percentchange(dataLF_true_ftab)
+        print("transforming all variables from log-levels to log-difference (maybe it makes no sense for some of them)")
+        dataLF_tab = _eval_diff(dataLF_tab)
+        dataLF_true_ftab = _eval_diff(dataLF_true_ftab)
         fdatesLF = fdatesLF[2:end]              # discard the first date when taking growth rates
-        store_YY_LF = out_struct.store_YY_LF[2:end,:,:]./out_struct.store_YY_LF[1:end-1,:,:].-1;
+        store_YY_LF = out_struct.store_YY_LF[2:end,:,:] .- out_struct.store_YY_LF[1:end-1,:,:];
     end
 
     var_list_true = colnames(dataLF_true_ftab);             # list of symbols of variables that will be evaluated
+    print("evaluating $var_list_true\n")
     data_eval_tab = dataLF_tab[:,var_list_true];            # sorting a subset of all low-frequency variables so that they will be evaluated in the correct order
 
     no_nan_flag_mat = .!isnan.(values(data_eval_tab));      # whether in the low-frequency data we have missing values, in the order of the variables in the true table (i.e. unbalanced panel for the low-freq variable)
