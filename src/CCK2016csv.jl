@@ -307,7 +307,13 @@ function csv_draw_h_ρ!(csv_h_struct, n,T,hyp_struct)
 end 
 
 
+"""
+    CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
 
+    Main function for the VAR model with common-stochastic volatility as in Carriero, Clark, and 
+    Marcellinio (2016), _JAE_.
+
+"""
 function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     # @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hyp_struct
     @unpack p, n_save, n_burn, prior_RW, est_hyp = set_struct
