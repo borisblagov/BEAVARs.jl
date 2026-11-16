@@ -60,10 +60,15 @@ This package has been written almost exclusively by hand, for better or for wors
 
 # References
 
+
 Banbura, Marta, Giannone, Domenico and Reichlin, Lucrezia, (2010), Large Bayesian vector auto regressions, _Journal of Applied Econometrics_, 25, issue 1, p. 71-92. [https://doi.org/10.1002/jae.1137](https://doi.org/10.1002/jae.1137). 
+
+Boris Blagov, Clara Krause (2026). Does it add up? Reconciling forecasts and Impulse responses for hierarchical macroeconomic data. _Ruhr Economic Papers_, 1224(1). [https://doi.org/10.4419/96973409](https://www.rwi-essen.de/fileadmin/user_upload/RWI/Publikationen/Ruhr_Economic_Papers/REP_26_1224.pdf)
 
 Chan, J.C.C. (2020), Large Bayesian Vecotrautoregressions, P. Fuleky (Eds), _Macroeconomic Forecasting in the Era of Big Data_, 95-125, Springer, Cham, [https://doi.org/10.1007/978-3-030-31150-6](https://doi.org/10.1007/978-3-030-31150-6)
 
 Chan, J.C.C., Poon, A, Zhu, D. (2023) High-dimensional conditionally Gaussian state space models with missing data, _Journal of Econometrics_, Volume 236, Issue 1, September 2023, 105468, [https://doi.org/10.1016/j.jeconom.2023.05.005](https://doi.org/10.1016/j.jeconom.2023.05.005)
 
-Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2016. Common Drifting Volatility in Large Bayesian VARs. _Journal of Business & Economic Statistics_ 34 (3): 375–90. https://doi.org/10.1080/07350015.2015.1040116.
+Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2013. Bayesian VARs: Specification Choices and Forecast Accuracy. _Journal of Applied Econometrics_ 30 (1): 46-73. https://doi.org/10.1002/jae.2315.
+
+Carriero, Andrea, Todd E. Clark, and Massimiliano Marcellino. 2016. Common Drifting Volatility in Large Bayesian VARs. _Journal of Business & Economic Statistics_ 34 (3): 375–390. https://doi.org/10.1080/07350015.2015.1040116.
