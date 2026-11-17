@@ -30,7 +30,7 @@ The Minnesota variance covariance matrix is defined as
   \frac{{c}_1}{l^2}, & \text{for coefficients on own lag } l \text{ for } l = 1, \dots, p \\[2ex]
   \frac{{c}_2 \sigma_{ii}}{l^2 \sigma_{jj}}, & \text{for coefficients on lag } l \text{ of variable } j \neq i \\
   & \text{for } l = 1, \dots, p \\[2ex]
-  {c}_3 \sigma_{ii}, & \text{for coefficients on exogenous variables}
+  {c}_4 \sigma_{ii}, & \text{for coefficients on the constant}
 \end{cases}
 ```
 
@@ -40,7 +40,7 @@ The code initializes this prior using the function `init_priorMinn` and does so 
     BEAVARs.init_priorMinn(n,p,sigmaP_vec,data_trans,hyp_struct)
 ```
 
-It first initializes a matrix $\mathbf{C_{\boldsymbol{\beta}}}_{i,jj}$  that does not incorporate the hyperpameters $c_1, c_2,$ and $c_3$. 
+It first initializes a matrix $\mathbf{C_{\boldsymbol{\beta}}}_{i,jj}$  that does not incorporate the hyperpameters $c_1, c_2,$ and $c_4$. 
 
 ```math
 \mathbf{C_{\boldsymbol{\beta}}}_{i,jj} = 
@@ -48,7 +48,7 @@ It first initializes a matrix $\mathbf{C_{\boldsymbol{\beta}}}_{i,jj}$  that doe
   \frac{1}{l^2}, & \text{for coefficients on own lag } l \text{ for } l = 1, \dots, p \\[2ex]
   \frac{1 \sigma_{ii}}{l^2 \sigma_{jj}}, & \text{for coefficients on lag } l \text{ of variable } j \neq i \\
   & \text{for } l = 1, \dots, p \\[2ex]
-  \sigma_{ii}, & \text{for coefficients on exogenous variables}
+  \sigma_{ii}, & \text{for coefficients on the constant}
 \end{cases}
 ```
 

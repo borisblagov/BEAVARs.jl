@@ -16,16 +16,63 @@
     The implementation of csv follows Chan (2020) and draws `h`, the stochastic volatility, using a Newton Rapson method and not the CCK article with Shephard and Chib's 1998 method.
 
 """
-function beavar(::CCK2016csv_type, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
-    println("Hello CCK2016csv")
+function beavar(model_type::CCK2016_absttype, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup)
+    println("Hello CCK2016")
     @unpack data_tab, data_mat, var_list = data_struct;
     freqL_date = BEAVARs.get_data_freq(data_tab);
     datesLF = timestamp(data_tab);
     datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
     fdatesLF = [datesLF;datesLF_fcast];
-    YY = values(data_struct.data_tab);
-    store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2 = BEAVARs.CCK2016csv(YY,set_struct,hyp_struct);
-    out_struct = VAROutput_CCK2016csv(store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1,store_c2,YY)
+    
+
+    if typeof(model_type) <: BEAVARs.CCK2016csv_type
+        setcsv = true
+    else
+        setcsv =false
+    end
+   
+    store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5 = BEAVARs.CCK2016(set_struct,hyp_struct,data_struct,setcsv);
+  
+    out_struct = VAROutput_CCK2016csv(store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1,store_c2, store_c5,data_mat)
+    return out_struct
+end
+
+
+
+@doc raw"""
+    beavarCCK_dep(::CCK2016_absttype, set_struct, hyp_struct, data_struct;test=false)
+
+    Estimates a BVAR with common stochastic volatility as proposed by Carriero, Clark, and Marcellino (2016).
+
+    The implementation of csv follows Chan (2020) and draws `h`, the stochastic volatility, using a Newton Rapson method and not the CCK article with Shephard and Chib's 1998 method.
+
+    SHOULD BE DEPRECIATED
+"""
+function beavarCCK_dep(model_type::CCK2016_absttype, set_struct::BVARmodelSetup, hyp_struct::BVARmodelHypSetup, data_struct::BVARmodelDataSetup;test=false)
+    println("Hello CCK2016")
+    @unpack data_tab, data_mat, var_list = data_struct;
+    freqL_date = BEAVARs.get_data_freq(data_tab);
+    datesLF = timestamp(data_tab);
+    datesLF_fcast = collect(datesLF[end]+freqL_date:freqL_date:datesLF[end]+freqL_date*(set_struct.n_fcst));
+    fdatesLF = [datesLF;datesLF_fcast];
+    YY = deepcopy(data_mat);
+    if typeof(model_type) <: BEAVARs.CCK2016csv_type
+        setcsv = true
+    else
+        setcsv =false
+    end
+    if test == false
+        if typeof(data_struct)<:BEAVARs.data_BVARX
+            @unpack dataX_tab, dataX_mat = data_struct;
+            YX = deepcopy(dataX_mat)
+            store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5 = BEAVARs.CCK2016csv(YY,YX,set_struct,hyp_struct);
+        else
+            store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5 = BEAVARs.CCK2016csv(YY,set_struct,hyp_struct);
+        end
+    else
+        store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5 = BEAVARs.CCK2016(set_struct,hyp_struct,data_struct,setcsv);
+    end
+    out_struct = VAROutput_CCK2016csv(store_β,store_Σ,store_h,store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1,store_c2, store_c5,YY)
     return out_struct
 end
 
@@ -40,9 +87,20 @@ function makeHypSetup(::CCK2016csv_type)
     return hypChan2020()
 end
 
+@doc raw"""
+    makeHypSetup(::CCK2016iniw_type)
+
+    Generate a hyperparameter strcture for use with the single-frequency models
+    
+"""
+function makeHypSetup(::CCK2016iniw_type)
+    return hypChan2020()
+end
+
+
 
 @doc raw"""
-    makeDataSetup(::CCK2016csv_type,data_tab::TimeArray; var_list =  colnames(data_tab))
+    makeDataSetup(::CCK2016_absttype,data_tab::TimeArray; var_list =  colnames(data_tab))
 
 Generate a dataset strcture for use with the single-frequency models
     
@@ -53,17 +111,31 @@ Generate a dataset strcture for use with the single-frequency models
 # Returns
     data_struct: A dataBVAR_TA structure with the data and metadata
 """
-function makeDataSetup(::CCK2016csv_type,data_tab::TimeArray; var_list =  colnames(data_tab))
+function makeDataSetup(::CCK2016_absttype,data_tab::TimeArray; var_list =  colnames(data_tab))
     return data_BVAR(data_tab,values(data_tab), var_list)
+end
+
+
+@doc raw"""
+    makeDataSetup(::CCK2016_absttype,data_tab::TimeArray; var_list =  colnames(data_tab))
+
+Generate a dataset strcture for use with the single-frequency models
+    
+# Arguments
+    model_type: The custom model type (not a string)
+    data_tab:   TimeArray with the data_de
+    var_list (optional):   A symbol list with the variable names. Will be used for oredering the variables. Uses by default the names from data_tab if not supplied. note that Symbol lists have a particular synthax.
+# Returns
+    data_struct: A dataBVAR_TA structure with the data and metadata
+"""
+function makeDataSetup(::CCK2016_absttype,data_tab::TimeArray,data_tabX::TimeArray; var_list =  colnames(data_tab))
+    return data_BVARX(data_tab,values(data_tab), data_tabX,values(data_tabX),var_list)
 end
 
 
 
 
-
-
-
-struct VAROutput_CCK2016csv{T <: AbstractFloat} <: BVARmodelOutput
+@with_kw struct VAROutput_CCK2016csv{T <: AbstractFloat} <: BVARmodelOutput
     store_β::Array{T,2}        # 
     store_Σ::Array{T,3}        # 
     store_h::Array{T,2}        # 
@@ -73,6 +145,7 @@ struct VAROutput_CCK2016csv{T <: AbstractFloat} <: BVARmodelOutput
     store_eh::Array{T,2}       #
     store_c1::Array{T,1}       #
     store_c2::Array{T,1}       #
+    store_c5::Array{T,1}       #
     YY::Array{T,2}             #
 end
 
@@ -81,6 +154,8 @@ end
 @doc raw"""
     BEAVARs.init_Minn_csv(YY, p)
 
+    Initialize the prior structures on β, Σ, and h for a common-stochastic volatility specification VAR model.
+    Also estimates a univariate AR(4) model and returns the β_hat and σ_hat.
 """
 function init_Minn_csv(YY,set_struct,hyp_struct)
     @unpack p = set_struct;
@@ -92,7 +167,7 @@ function init_Minn_csv(YY,set_struct,hyp_struct)
     sigmaP_ar4, betaOLS_ar4     = ar4(YY);                                  # do OLS to initialize priors as in CCK2016
     k                           = n*p+intercept
     h                           = zeros(T,);                                # stochastic volatilities
-    S_0                         = diagm(sigmaP_ar4);                            # initialize S_0
+    S_0                         = diagm(sigmaP_ar4);                        # initialize S_0
     Σt_inv                      = S_0\I;                                    # initialize Σ^-1   
     Σ_inv_bb                    = BlockBandedMatrix{Float64}(undef,ones(Int,T,).*n, ones(Int,T,).*n, (0, 0))
     XtΣ_inv_den                 = zeros(k*n,T*n);                           # will be X' ( I(T) ⊗ Σ-1 )   from page 6 in Chan 2020 LBA
@@ -109,8 +184,55 @@ function init_Minn_csv(YY,set_struct,hyp_struct)
     csv_Σt_struct = BEAVARs.make_csv_Σt_struct(Uvec,Σt,Σt_inv,S_0,hyp_struct.nu0,hyp_struct.nu0+T+n,cholesky(S_0).U)
 
     csv_h_struct = init_csv_struct(h,hyp_struct,T,T+p)
-    return Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_struct, csv_Σt_struct, csv_h_struct
+    return Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_struct, csv_Σt_struct, csv_h_struct, k
 end
+
+
+
+@doc raw"""
+    BEAVARs.init_Minn_csv(YY,YX, p)
+
+    Initialize the prior structures on β, Σ, and h for a common-stochastic volatility specification VARX model (with exogenous variables).
+    Also estimates a univariate AR(4) model and returns the β_hat and σ_hat.
+"""
+function init_Minn_csv(YY,YX,set_struct,hyp_struct)
+    @unpack p, q    = set_struct;
+    @unpack ρ       = hyp_struct;
+    vq              = q;                                                    # total No. of lags of exogenous variables. for VARX simply q, for GVAR q+1, because we have the 0th lag (contemporaneous info)
+    if set_struct.const_loc == 1
+        # will err if false, on purpose to catch if we define the constant wrong.
+        Y, X, T, n, intercept       = mlagL(YY,p);
+        Yex, Xex, Tex, nex          = BEAVARs.mlag_nc(YX,q);
+        Xfull                       = [X Xex];
+        if T !== Tex
+            error("length of endogenous (YY) and exogenous variables (YX) must match!")
+        end
+    end
+    nfull                       = n + nex;                                  # number of variables (endogenous + exogenous)
+    sigmaP_ar4, betaOLS_ar4     = BEAVARs.ar4(YY);                                  # do OLS to initialize priors as in CCK2016
+    sigmaPex_ar4, betaOLSex_ar4 = BEAVARs.ar4(YX);                                  # AR(4) on the exogenous variables
+    k                           = nfull*p+intercept
+    h                           = zeros(T,);                                # stochastic volatilities
+    S_0                         = diagm(sigmaP_ar4);                            # initialize S_0
+    Σt_inv                      = S_0\I;                                    # initialize Σ^-1   
+    Σ_inv_bb                    = BlockBandedMatrix{Float64}(undef,ones(Int,T,).*n, ones(Int,T,).*n, (0, 0))
+    XtΣ_inv_den                 = zeros(k*n,T*n);                           # will be X' ( I(T) ⊗ Σ-1 )   from page 6 in Chan 2020 LBA
+    XtΣ_inv_X                   = zeros(n*k,n*k);                           # will be X' ( I(T) ⊗ Σ-1 ) X from page 6 in Chan 2020 LBA    
+    Xsur                        = BEAVARs.XSurFormMatrix(Xfull,n);              # prepares the SUR form and the indices of the parameters for updating
+    K_β                         = zeros(n*k,n*k);                           # Variance covariance matrix of the parameters
+    
+    priorMinn_struct = BEAVARs.init_priorMinn(n,nex,p,vq,sigmaP_ar4,sigmaPex_ar4,set_struct.prior_RW,hyp_struct)
+
+    β_hat_struct = BEAVARs.make_βdraw_bb_struct(zeros(k*n,),zeros(k*n,),zeros(k*n,), Xsur, XtΣ_inv_den, XtΣ_inv_X, Σ_inv_bb, K_β)
+
+    Uvec = similar(vec(Y'))
+    Σt   = similar(S_0)
+    csv_Σt_struct = BEAVARs.make_csv_Σt_struct(Uvec,Σt,Σt_inv,S_0,hyp_struct.nu0,hyp_struct.nu0+T+n,cholesky(S_0).U)
+
+    csv_h_struct = init_csv_struct(h,hyp_struct,T,T+p)
+    return Y, Xfull, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_struct, csv_Σt_struct, csv_h_struct, nex, vq
+end
+
 
 
 @doc raw"""
@@ -146,7 +268,7 @@ function update_Σ_inv_bb_csv!(Σ_inv_bb,Σt_inv,expmh,T,n)
 end
 
 
-struct make_βdraw_bb_struct{T <: AbstractFloat}
+@with_kw struct make_βdraw_bb_struct{T <: AbstractFloat}
     β_draw::Array{T,1}        # final draw of β
     β_hat::Array{T,1}         #  posterior mean of β
     β_rand::Array{T,1}        # random draw
@@ -159,7 +281,7 @@ end
 
 
 
-struct make_csv_h_struct{T <: AbstractFloat}
+@with_kw struct make_csv_h_struct{T <: AbstractFloat}
     h::Array{T,1}                   # h for T
     expmh::Array{T,1}               # exp.(-h) for T
     ht::Array{T,1}
@@ -310,9 +432,10 @@ end
 """
     CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
 
-    Main function for the VAR model with common-stochastic volatility as in Carriero, Clark, and 
+    Older function for the VAR model with common-stochastic volatility as in Carriero, Clark, and 
     Marcellinio (2016), _JAE_.
 
+    SHOULD BE DEPRECIATED
 """
 function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
     # @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hyp_struct
@@ -321,9 +444,10 @@ function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BV
 
 
     Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_bb_struct, csv_Σt_struct, csv_h_struct = BEAVARs.init_Minn_csv(YY,set_struct,hyp_struct)
+    k_beta = length(priorMinn_struct.β_prior);
     vecYt = vec(Y')
     
-    store_β = zeros(n^2*p+n,n_save);
+    store_β = zeros(k_beta,n_save);
     store_Σ = zeros(n,n,n_save);
     store_h = zeros(T,n_save);
     store_s2_h = zeros(T,n_save);
@@ -332,6 +456,7 @@ function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BV
     store_eh = zeros(T,n_save);
     store_c1 = zeros(n_save,);
     store_c2 = zeros(n_save,);
+    store_c5 = zeros(n_save,);
     
     for ii = 1:n_draws 
         BEAVARs.update_Σ_inv_bb_csv!(β_hat_bb_struct.Σ_inv_bb,csv_Σt_struct.Σt_inv,csv_h_struct.expmh,T,n);
@@ -357,9 +482,154 @@ function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BV
             store_c2[ii-n_burn,] = hyp_struct.c2;
         end
     end
-    return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2
+    return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5
 end 
 
+
+"""
+    CCK2016csv(YY,YX,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+
+    Older function for the VARX model with common-stochastic volatility as in Carriero, Clark, and 
+    Marcellinio (2016), _JAE_.
+
+    SHOULD BE DEPRECIATED
+"""
+function CCK2016csv(YY,YX,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+    # @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hyp_struct
+    @unpack p, n_save, n_burn, prior_RW, est_hyp = set_struct
+    n_draws  = n_save+n_burn;
+
+
+    Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_bb_struct, csv_Σt_struct, csv_h_struct, nex, vq = BEAVARs.init_Minn_csv(YY,YX,set_struct,hyp_struct)
+    k_beta = length(priorMinn_struct.β_prior);
+    vecYt = vec(Y')
+    
+    store_β = zeros(k_beta,n_save);
+    store_Σ = zeros(n,n,n_save);
+    store_h = zeros(T,n_save);
+    store_s2_h = zeros(T,n_save);
+    store_ρ = zeros(n_save,);
+    store_σ_h2 = zeros(n_save,); 
+    store_eh = zeros(T,n_save);
+    store_c1 = zeros(n_save,);
+    store_c2 = zeros(n_save,);
+    store_c5 = zeros(n_save,);
+    
+    for ii = 1:n_draws 
+        BEAVARs.update_Σ_inv_bb_csv!(β_hat_bb_struct.Σ_inv_bb,csv_Σt_struct.Σt_inv,csv_h_struct.expmh,T,n);
+        BEAVARs.Chan2020_draw_βsur_bb_NoPrUpd!(priorMinn_struct,β_hat_bb_struct,X,vecYt);
+        BEAVARs.CCK2016_drawΣtsur!(vecYt,β_hat_bb_struct,csv_Σt_struct,csv_h_struct,n,T);
+        BEAVARs.csv_draw_h_ρ!(csv_h_struct, n,T,hyp_struct); 
+
+        if est_hyp == true
+            κ1, κ2, κ5 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p, nex, vq)
+            hyp_struct = hypChan2020(c1=κ1,c2=κ2,c5=κ5);
+            BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
+        end
+
+        if ii>n_burn
+            store_β[:,ii-n_burn] = β_hat_bb_struct.β_draw;
+            store_Σ[:,:,ii-n_burn] = csv_Σt_struct.Σt;
+            store_h[:,ii-n_burn] = csv_h_struct.h;
+            store_s2_h[:,ii-n_burn] = csv_h_struct.s2_h;
+            store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
+            store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
+            store_eh[:,ii-n_burn] = csv_h_struct.eh;
+            store_c1[ii-n_burn,] = hyp_struct.c1;
+            store_c2[ii-n_burn,] = hyp_struct.c2;
+            store_c5[ii-n_burn,] = hyp_struct.c5;
+        end
+    end
+    return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5
+end 
+
+
+
+
+"""
+    CCK2016(YY,YX,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup)
+
+    Main function for the VAR models with constant volatility or with common-stochastic volatility as in Carriero, Clark, and 
+    Marcellinio (2016), _JAE_.
+
+"""
+function CCK2016(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,data_struct::BVARmodelDataSetup,setcsv::Bool)
+    # @unpack ρ, σ_h2, v_h0, S_h0, ρ_0, V_ρ = hyp_struct
+    @unpack data_tab, data_mat, var_list = data_struct
+    @unpack p, n_save, n_burn, prior_RW, est_hyp, show_prog = set_struct
+    if typeof(data_struct)<:BEAVARs.data_BVARX
+        @unpack dataX_tab, dataX_mat = data_struct;
+        YX = deepcopy(dataX_mat)      
+        exog_flag = true
+    else
+        exog_flag = false  
+    end
+    YY = deepcopy(data_mat);
+    n_draws  = n_save+n_burn;
+
+    if exog_flag == false
+        Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_bb_struct, csv_Σt_struct, csv_h_struct = BEAVARs.init_Minn_csv(YY,set_struct,hyp_struct)
+        nex = 0;
+        vq = 0;
+    elseif exog_flag == true
+        Y, X, T, n, sigmaP_ar4, betaOLS_ar4, priorMinn_struct, β_hat_bb_struct, csv_Σt_struct, csv_h_struct, nex, vq = BEAVARs.init_Minn_csv(YY,YX,set_struct,hyp_struct)
+    end
+    k_beta = length(priorMinn_struct.β_prior);
+    vecYt = vec(Y')
+    
+    store_β = zeros(k_beta,n_save);
+    store_Σ = zeros(n,n,n_save);
+    store_h = zeros(T,n_save);
+    store_s2_h = zeros(T,n_save);
+    store_ρ = zeros(n_save,);
+    store_σ_h2 = zeros(n_save,); 
+    store_eh = zeros(T,n_save);
+    store_c1 = zeros(n_save,);
+    store_c2 = zeros(n_save,);
+    store_c5 = zeros(n_save,);
+
+    progress_bar = Progress(n_draws; dt=1.0,enabled = show_prog)
+    
+    for ii = 1:n_draws 
+        BEAVARs.update_Σ_inv_bb_csv!(β_hat_bb_struct.Σ_inv_bb,csv_Σt_struct.Σt_inv,csv_h_struct.expmh,T,n);
+        BEAVARs.Chan2020_draw_βsur_bb_NoPrUpd!(priorMinn_struct,β_hat_bb_struct,X,vecYt);
+        BEAVARs.CCK2016_drawΣtsur!(vecYt,β_hat_bb_struct,csv_Σt_struct,csv_h_struct,n,T);
+
+        # if we don't draw h we will remain at exp(-h) = ones(T,), which will result down to an independent normal inverse Wishart prior
+        if setcsv == true
+            BEAVARs.csv_draw_h_ρ!(csv_h_struct, n,T,hyp_struct); 
+        end
+
+        if est_hyp == true
+            if nex == 0
+                κ1, κ2 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p)
+                hyp_struct = hypChan2020(c1=κ1,c2=κ2);
+            else
+                κ1, κ2, κ5 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p, nex, vq)
+                hyp_struct = hypChan2020(c1=κ1,c2=κ2,c5=κ5);
+            end
+            BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
+        end
+
+        if ii>n_burn
+            store_β[:,ii-n_burn] = β_hat_bb_struct.β_draw;
+            store_Σ[:,:,ii-n_burn] = csv_Σt_struct.Σt;
+            store_h[:,ii-n_burn] = csv_h_struct.h;
+            store_s2_h[:,ii-n_burn] = csv_h_struct.s2_h;
+            store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
+            store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
+            store_eh[:,ii-n_burn] = csv_h_struct.eh;
+            store_c1[ii-n_burn,] = hyp_struct.c1;
+            store_c2[ii-n_burn,] = hyp_struct.c2;
+            store_c5[ii-n_burn,] = hyp_struct.c5;
+        end
+        # show progress bar
+        if show_prog == true
+            next!(progress_bar, showvalues = generate_showvalues(ii, n_draws))
+        end
+    end
+    return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5
+end 
 
 
 """

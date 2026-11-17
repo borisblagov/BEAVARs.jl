@@ -24,6 +24,20 @@ end
     # Write your tests here.
     @test 1 == 1
 
+    @testset "dropvars does not mutate its input" begin
+        symbols = [:apple, :banana, :cherry]
+
+        single_result = BEAVARs.dropvars(symbols, :banana)
+        @test single_result == [:apple, :cherry]
+        @test single_result !== symbols
+        @test symbols == [:apple, :banana, :cherry]
+
+        multiple_result = BEAVARs.dropvars(symbols, [:apple, :cherry])
+        @test multiple_result == [:banana]
+        @test multiple_result !== symbols
+        @test symbols == [:apple, :banana, :cherry]
+    end
+
     @testset "beavars_prep_eval accepts concrete dictionary value types" begin
         output_dict = ThreadSafeDict{String, TestBVARmodelOutput}()
         setup_dict = ThreadSafeDict{String, BEAVARs.LoopSetup}()

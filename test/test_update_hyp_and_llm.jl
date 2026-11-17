@@ -19,8 +19,8 @@ BEAVARs.Chan2020_draw_βsur_bb!(priorMinn_struct,β_hat_bb_struct,X,vecYt);
 BEAVARs.CCK2016_drawΣtsur!(vecYt,β_hat_bb_struct,csv_Σt_struct,csv_h_struct,n,T);
 BEAVARs.csv_draw_h_ρ!(csv_h_struct, n,T,hyp_struct); 
 
-@unpack β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa3, Ψ_vec = priorMinn_struct
-@unpack c_11, c_12, c_21, c_22 = hyp_struct;
+@unpack β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa4, Ψ_vec = priorMinn_struct
+@unpack c1_1, c2_1, c1_2, c2_2 = hyp_struct;
 @unpack β_draw = β_hat_bb_struct;
 
 sum_S_κ1 = sum( (β_draw[idx_kappa1] .- β_prior[idx_kappa1]).^2 ./(2.0.*Ψ_vec[idx_kappa1].*Cβ_vec[idx_kappa1]))

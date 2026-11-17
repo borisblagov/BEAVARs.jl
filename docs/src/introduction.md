@@ -89,7 +89,7 @@ After pressing enter we are greeted with the following output, which is a bit ha
 , hypChan2020
   c1: Float64 0.04
   c2: Float64 0.01
-  c3: Float64 100.0
+  c4: Float64 100.0
   ρ: Float64 0.8
   σ_h2: Float64 0.1
   v_h0: Float64 5.0

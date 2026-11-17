@@ -26,6 +26,7 @@ export beavar, beavars, beavars_weave, makeOutput, makeSetup, makeHypSetup, make
 abstract type BVARmodelType end         # types for models
 abstract type BVARmodelMFType <: BVARmodelType end # a type cathing all mixed frequency models
 abstract type BVARmodelSFType <: BVARmodelType end # a type cathing all single frequency models
+abstract type CCK2016_absttype <: BVARmodelSFType end          # gabstract type for Carriero Clark and Marcellinio 2016
 abstract type BVARmodelSetup end        # type for VAR setup parameters
 abstract type BVARmodelHypSetup end     # types for hyperparameters
 abstract type BVARmodelDataSetup end    # types for storing the data unputs to the models
@@ -41,7 +42,8 @@ abstract type BVARforecastOutput end    # type for forecast output storage
 struct Chan2020minn_type <: BVARmodelSFType end
 struct Chan2020iniw_type <: BVARmodelSFType end
 struct Chan2020csv_type <: BVARmodelSFType end
-struct CCK2016csv_type <: BVARmodelSFType end
+struct CCK2016csv_type <: CCK2016_absttype end
+struct CCK2016iniw_type <: CCK2016_absttype end
 struct BGR2010_type <: BVARmodelSFType end
 struct CPZ2023_type <: BVARmodelMFType end
 struct CPZ2023iniw_type <: BVARmodelMFType end
@@ -61,6 +63,8 @@ function selectModel(model_str::String)
         model_type = Chan2020csv_type()
     elseif model_str == "CCK2016csv"
         model_type = CCK2016csv_type()
+    elseif model_str == "CCK2016iniw"
+        model_type = CCK2016iniw_type()
     elseif model_str == "BGR2010"
         model_type = BGR2010_type()
     elseif model_str == "CPZ2023"
@@ -100,10 +104,20 @@ end
 
 # Structure for the datasets for the standard BVARs
 @with_kw struct data_BVAR{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
-    data_tab::TimeArray{T,N,D,A}                                             # data for the high-frequency variables
+    data_tab::TimeArray{T,N,D,A}                                       # data for the high-frequency variables
     data_mat::Array{T,N}
     var_list::Array{Symbol,1}                                          # Symbol vector with the variable names, will be used for ordering
 end
+
+# Structure for the datasets for BVARX, models with exogenous variables
+@with_kw struct data_BVARX{T <: AbstractFloat, N, D, A <: AbstractArray{T, N}} <: BVARmodelDataSetup
+    data_tab::TimeArray{T,N,D,A}                                       # data for the endogenous variables
+    data_mat::Array{T,N}
+    dataX_tab::TimeArray{T,N,D,A}                                      # data for the exogenous variables
+    dataX_mat::Array{T,N}                                              
+    var_list::Array{Symbol,1}                                          # Symbol vector with the variable names, will be used for ordering
+end
+
 
 
 # Structure for the datasets of a mixed-frequency BVAR
@@ -170,15 +184,16 @@ end
 
 # main setup structure for a BEAVAR model
 @with_kw struct VARSetup <: BVARmodelSetup
-    p::Int          # number of lags
-    n_save::Int      # gibbs to save
-    n_burn::Int      # gibbs to burn
+    p::Int          # number of lags for the endogenous variables
+    n_burn::Int     # gibbs to burn
+    n_save::Int     # gibbs to save
     n_irf::Int      # number of impulse responses
     n_fcst::Int     # number of forecast periods
     const_loc::Int  # location of the constant
     prior_RW::Int   # 1 for random walk prior (Y = B1*Y_tm1 + .... with B1 being identity matrix), or 0 for B1 = zeros(n,n), #TODO add for OLS (persistent), #TODO add for mix
     est_hyp::Bool   # set to true to estimate hyperparameters
     show_prog::Bool # set to true to show the progressbar (default)
+    q::Int          # number of lags for the exogenous variables, set by default to p
 end
 
 # types for forecast output export
@@ -249,7 +264,7 @@ Only the first argument is mandatory, rest is optional with default values.
 
 See also [`hypChan2020`](@ref), [`hypBGR2010`](@ref).
 """
-function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct(),prior_RW::Int = 0,est_hyp=false,show_prog=true)
+function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,n_irf::Int=16,n_fcst::Int = 8,hyp::BVARmodelHypSetup=hypDefault_struct(),prior_RW::Int = 0,est_hyp=false,show_prog=true,q=p)
     model_type = BEAVARs.selectModel(model_str)
     # checking if user supplied the hyperparameter structure
     if isa(hyp,hypDefault_struct)                        # if not supplied, make a default one
@@ -260,7 +275,7 @@ function makeSetup(model_str::String;p::Int=4,n_burn::Int=1000,n_save::Int=1000,
 
     intercept = BEAVARs.selectConstLoc(model_str);
     
-    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept,prior_RW,est_hyp,show_prog);
+    set_struct = BEAVARs.VARSetup(p,n_burn,n_save,n_irf,n_fcst,intercept,prior_RW,est_hyp,show_prog,q);
     return model_type, set_struct, hyp_struct
 end
 
@@ -284,6 +299,8 @@ function selectConstLoc(model_str::String)
     elseif model_str == "CPZ2023dev"
         const_loc = 1
     elseif model_str == "CCK2016csv"
+        const_loc = 1
+    elseif model_str == "CCK2016iniw"
         const_loc = 1
     elseif model_str == "Blagov2025"
         const_loc = 1

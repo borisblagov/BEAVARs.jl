@@ -547,7 +547,7 @@ end
   dates in `z_cs_tab`.
 - `var_list`: The variable ordering used by the model. Defaults to the
   high-frequency variable names followed by the low-frequency variable names. 
-  You can use this also to drop specific variables for testing, see the function BEAVARs.dropbvars()
+  You can use this also to drop specific variables for testing, see the function BEAVARs.dropvars()
 - `cs_scVal`: Error tolerance for the cross-sectional constraint, used as the
   diagonal error variance for its observations. Smaller values enforce the
   constraint more tightly; the default is `1e-7`. If your data is in percentage points like  
@@ -596,7 +596,7 @@ end
   dates in `z_cs_tab`.
 - `var_list`: The variable ordering used by the model. Defaults to the
   high-frequency variable names followed by the low-frequency variable names. 
-  You can use this also to drop specific variables for testing, see the function BEAVARs.dropbvars()
+  You can use this also to drop specific variables for testing, see the function BEAVARs.dropvars()
 - `cs_scVal`: Error tolerance for the cross-sectional constraint, used as the
   diagonal error variance for its observations. Smaller values enforce the
   constraint more tightly; the default is `1e-7`. If your data is in percentage points like  

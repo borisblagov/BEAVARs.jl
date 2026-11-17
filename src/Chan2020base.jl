@@ -11,14 +11,16 @@ Populate a hyperparamater structure for models based on Chan (2020) priors
 # Arguments
         c1: hyperparameter on own lags 
         c2: hyperparameter on other lags
-        c3: hyperparameter on the constant
+        c4: hyperparameter on the constant
+        c5: hyperparameter on the exogenous variables
         ρ:  ar(1) parameter for the stochastic volatility (for csv models only)
         σ_h2: variance of the log-volatility (for csv models only)
 """
 @with_kw struct hypChan2020 <: BVARmodelHypSetup
     c1::Float64     = 0.04;         # hyperparameter on own lags
     c2::Float64     = 0.01;         # hyperparameter on other lags
-    c3::Float64     = 100.0;        # hyperparameter on the constant
+    c4::Float64     = 100.0;        # hyperparameter on the constant
+    c5::Float64     = 0.01;         # hyperparameter on other lags
     ρ::Float64      = 0.8;
     σ_h2::Float64   = 0.1;
     v_h0::Float64   = 5.0; 
@@ -27,10 +29,12 @@ Populate a hyperparamater structure for models based on Chan (2020) priors
     V_ρ::Float64    = 0.04;
     q::Float64      = 0.5;
     nu0::Int        = 3;           # degrees of freedom to add for the inverse wishart distribution of the variance-covariance matrices
-    c_11::Float64   = 1.0;         # hyper-hyperparameter for c1 ∼ Gamma(c_11,c_12), lower bound 
-    c_21::Float64   = 25.0;        # hyper-hyperparameter for c1 ∼ Gamma(c_11,c_12), upper bound, 1.0/ 0.04 
-    c_12::Float64   = 1.0;         # hyper-hyperparameter for c1 ∼ Gamma(c_21,c_22), lower bound
-    c_22::Float64   = 625.0;       # hyper-hyperparameter for c1 ∼ Gamma(c_21,c_22), upper bound, 1.0/(0.04^2)
+    c1_1::Float64   = 1.0;         # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), lower bound 
+    c1_2::Float64   = 25.0;        # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), upper bound, 1.0/ 0.04 
+    c2_1::Float64   = 1.0;         # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), lower bound
+    c2_2::Float64   = 625.0;       # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), upper bound, 1.0/(0.04^2)
+    c5_1::Float64   = 1.0;         # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), lower bound
+    c5_2::Float64   = 625.0;       # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), upper bound, 1.0/(0.04^2)
     ν_ψ::Float64    = 0.5;         # for global-local priors ν_ψ ∼ Gamma(d1,d2) and ψ_ij ∼ Gamma(ν_ψ, ν_ψ/2)
 end
 
@@ -297,7 +301,7 @@ are referred to as ``\kappa_1``, ``\kappa_2``, and ``\kappa_4`` (``\kappa_3`` is
 
 """
 function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{},hypSetup::BVARmodelHypSetup,data_trans::Integer)    
-    @unpack c1,c2,c3 = hypSetup
+    @unpack c1,c2,c4 = hypSetup
     C = zeros(n^2*p+n,);
     βMinn = zeros(n^2*p+n);                         # initialize the prior mean for growth rates, e.g. center at 0
     np1 = n*p+1                                     # number of parameters per equation
@@ -314,7 +318,7 @@ function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{},hypSetup::BVARmod
             idx = n;
         end
         if j == 1                   # Constant is the first element in each equation
-            Ci[j] = c3;
+            Ci[j] = c4;
         elseif idx == ii            # These are the own lags of the variable
             if l == 1 && data_trans == 1              # If we have levels instead of growth rates we add a "1" for the first lag
                 βMinn[idx_count,] = 1;
@@ -356,7 +360,7 @@ Note that C is now (n*p+1 x 1) and not n^2*p+n as [`prior_Minn(x)`](@ref)
 
 """
 function prior_NatConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)    
-    @unpack c1,c3 = hypSetup;
+    @unpack c1,c4 = hypSetup;
     np1 = n*p+1 # number of parameters per equation
     # TODO these indices here idx_kappa1 and idx_kappa2 are wrong! idx_kappa1 is not the own lags but all except the constant. Also, C is not C but V_minn because it already incorporates sigmaP
     idx_kappa1 =  Vector{Int}()
@@ -372,7 +376,7 @@ function prior_NatConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetu
             idx = n;
         end
         if j == 1
-            V_A0[j] = c3;
+            V_A0[j] = c4;
         else
             V_A0[j] = c1/((l^2)*sigmaP_vec[idx]);
             push!(idx_kappa1,idx_count)

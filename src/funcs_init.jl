@@ -22,9 +22,9 @@ function mlag(Yfull::Matrix{Float64},p::Integer)
 end
 
 """
-    mlagL!(YY,Y,X,p,n;intercept=1)
+    mlagL!(YY,Y,X,p,n)
 
-Creates lagged matrices Y and X by mutating. Assumes constant is on the left of X
+    Updates lagged matrices Y and X by mutating. Assumes constant is on the left of X
 """
 function mlagL!(YY,Y,X,p,n)
     for i = 1:p
@@ -35,9 +35,9 @@ function mlagL!(YY,Y,X,p,n)
 end
 
 """
-    mlagL!(YY,X,p,n;intercept=1)
+    mlagL!(YY,X,p,n)
 
-    Creates lagged matrices X by mutating. Assumes constant is on the left of X and that Y is already a view of YY
+    Updates lagged matrices X by mutating. Assumes constant is on the left of X and that Y is already a view of YY
 """
 function mlagL!(YY,X,p,n)
     for i = 1:p
@@ -68,6 +68,28 @@ function mlagL(Yfull::Array{Float64},p::Integer)
     return Y, X, T, n, const_loc
 end
 
+
+
+"""
+    mlag_nc(Yfull::Matrix{Float64},p::Integer)
+
+    Creates lags of a matrix for a VAR representation without a constant in X.
+
+# Arguments
+    Yfull: a matrix of dimensions T+p x N returns a matrix Y with dimensions TxN and X with dimenions Tx(N*p+1)
+"""
+function mlag_nc(Yfull::Array{Float64},p::Integer)
+    (Tf, n) = size(Yfull)
+    T = Tf-p;
+    X = zeros(T,n*p)
+    for i = 1:p
+        X[:,1+n*(i-1):0+n+n*(i-1)] = Yfull[p-i+1:end-i,:]
+    end
+    Y = Yfull[p+1:end,:]
+    return Y, X, T, n
+end
+
+
 """
     ols(Y,X)
 
@@ -83,10 +105,10 @@ function ols(Y,X)
 end
 
 """
-    ols(Y,X)
+    ols2(Y,X,β,ε,T,n,σ_sq)
 
-Performs standard linear regression on two matrices Y and X,
-returning β as a vector, the vector of residuals ε and the variance σ_sq
+    Performs standard linear regression on two matrices Y and X,
+    returning β as a vector, the vector of residuals ε and the variance σ_sq
 """
 function ols2(Y,X,β,ε,T,n,σ_sq)
     # β = vec(X\Y);

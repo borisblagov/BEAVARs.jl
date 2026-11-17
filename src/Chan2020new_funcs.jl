@@ -1,18 +1,19 @@
 """
-    BVARpriorMinn(β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa3)
+    BVARpriorMinn(β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa4, idx_kappa5)
 
     Returns a structure containing the main elements of a Minnesota prior for a Bayesian VAR model. The structure includes the prior mean, variance, and indices for the location of the different types of coefficients (own lags, other lags, constants).
 """
-struct BVARpriorMinn{T <: AbstractFloat}
-    β_prior::Array{T,1}        # vector of either zeros or ones depending on the data transformation
-    Cβ_vec::Array{T,1}         # collects the diagonal elements of V but without the hyperparameters
-    Vβ_vec::Array{T,1}         # under classical minnesota prior variance is diagonal
-    Vβ_inv::Array{T,2}         # inverse of the matrix with a diagonal Vβ_vec
+@with_kw struct BVARpriorMinn{T <: AbstractFloat}
+    β_prior::Array{T,1}         # vector of either zeros or ones depending on the data transformation
+    Cβ_vec::Array{T,1}          # collects the diagonal elements of V but without the hyperparameters
+    Vβ_vec::Array{T,1}          # under classical minnesota prior variance is diagonal
+    Vβ_inv::Array{T,2}          # inverse of the matrix with a diagonal Vβ_vec
     Vβ_inv_vecView::SubArray{}  # view of the diagonal of Vβ_inv for fast updating
     Vinvβ_prior::Array{T,1}        # vector of V^-1 * β_prior
-    idx_kappa1::Array{Int,1} # indices of parameters associated with own lag
-    idx_kappa2::Array{Int,1} # indices of parameters associated with other variables and their lags
-    idx_kappa3::Array{Int,1} # indices of parameters associated with the constant term
+    idx_kappa1::Array{Int,1}    # indices of parameters associated with own lag
+    idx_kappa2::Array{Int,1}    # indices of parameters associated with other variables and their lags
+    idx_kappa4::Array{Int,1}    # indices of parameters associated with the constant term
+    idx_kappa5::Array{Int,1}    # indices of parameters associated with exogenous variables
     Ψ_vec::Array{T,1}
 end
 
@@ -448,16 +449,18 @@ end
     - `prior_struct`: A `BVARpriorMinn` structure containing the prior mean, variance, and indices for different types of coefficients (own lags, other lags, constants).
 """
 function init_priorMinn(n,p,sigmaP_vec,data_trans,hyp_struct)
-    Cβ_vec = zeros(n^2*p+n,);       
-    Vβ_vec = zeros(n^2*p+n,);                       # C diag but without the hyperparameters
-    Ψ_vec  = ones(n^2*p+n);                         # For global local priors (not yet implemented)
-    β_prior = zeros(n^2*p+n);                       # initialize the prior mean for growth rates, e.g. center at 0
-    np1 = n*p+1                                     # number of parameters per equation
+    k_ii   = n*p+1                                 # number of parameters per equation
+    k_beta = k_ii*n;
+    Cβ_vec = zeros(k_beta,);       
+    Vβ_vec = zeros(k_beta,);                       # C diag but without the hyperparameters
+    Ψ_vec  = ones(k_beta);                         # For global local priors (not yet implemented)
+    β_prior = zeros(k_beta);                       # initialize the prior mean for growth rates, e.g. center at 0
     idx_kappa1 =  Vector{Int}()
     idx_kappa2 =  Vector{Int}()
-    idx_kappa3 =  Vector{Int}()
+    idx_kappa4 =  Vector{Int}()
+    idx_kappa5 =  Vector{Int}()
     idx_count = 1    
-    Vi = zeros(np1,1)     # vector for equation i
+    Vi      = zeros(k_ii,1)                              # vector for equation i
 
     for ii = 1:n
       for j = 1:n*p+1       # for j=1:n*p+1 
@@ -468,7 +471,7 @@ function init_priorMinn(n,p,sigmaP_vec,data_trans,hyp_struct)
         end
         if j == 1                   # Constant is the first element in each equation
             Vi[j] = 1;
-            push!(idx_kappa3,idx_count)
+            push!(idx_kappa4,idx_count)
         elseif idx == ii            # These are the own lags of the variable
             if l == 1 && data_trans == 1              # If we have levels instead of growth rates we add a "1" for the first lag
                 β_prior[idx_count,] = 1.0;
@@ -482,17 +485,97 @@ function init_priorMinn(n,p,sigmaP_vec,data_trans,hyp_struct)
         idx_count += 1
     end
 
-    Cβ_vec[(ii-1)*np1+1:ii*np1] = Vi
+    Cβ_vec[(ii-1)*k_ii+1:ii*k_ii] = Vi
     end
     
     
     Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c1;  # own lags
     Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c2;  # other lags
-    Vβ_vec[idx_kappa3] .= Cβ_vec[idx_kappa3] .* hyp_struct.c3;  # constant
+    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c4;  # constant
     Vβ_inv = diagm(1.0./Vβ_vec);
     Vβ_inv_vecView = @view(Vβ_inv[diagind(Vβ_inv)]);
     Vinvβ_prior = Vβ_inv*β_prior;
-    priorMinn_struct = BVARpriorMinn(β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa3, Ψ_vec)
+    priorMinn_struct = BVARpriorMinn(β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa4, idx_kappa5, Ψ_vec)
+
+    return priorMinn_struct
+
+end
+
+
+@doc raw"""
+    prior_struct = init_priorMinn(n,nex,p,vq,sigmaP_vec,sigmaPex_vec,data_trans,hyp_struct)
+
+    Initializes the Minnesota prior structure for a Bayesian VARX model with exogenous variables. The function computes the prior mean and variance for the coefficients based on the number of variables, lags, and hyperparameters provided.
+
+    # Arguments
+    - `n`: Number of endogenous variables in the VAR.
+    - `p`: Number of lags in the VAR.
+    - `sigmaP_vec`: Vector of standard deviations for each variable, used to scale the prior variances.
+    - `data_trans`: Indicator for data transformation (e.g., levels or growth rates).
+    - `hyp_struct`: Structure containing hyperparameters for the Minnesota prior.
+
+    # Returns
+    - `prior_struct`: A `BVARpriorMinn` structure containing the prior mean, variance, and indices for different types of coefficients (own lags, other lags, constants).
+"""
+function init_priorMinn(n,nex,p,vq,sigmaP_vec,sigmaPex_vec,data_trans,hyp_struct)
+    k_ii    = n*p+1+nex*vq                          # number of parameters per equation
+    k_beta  = k_ii*n;                               # number of parameters for β
+    Cβ_vec  = zeros(k_beta,);       
+    Vβ_vec  = zeros(k_beta,);                       # C diag but without the hyperparameters
+    Ψ_vec   = ones(k_beta);                         # For global local priors (not yet implemented)
+    β_prior = zeros(k_beta);                        # initialize the prior mean for growth rates, e.g. center at 0
+    idx_kappa1 =  Vector{Int}()
+    idx_kappa2 =  Vector{Int}()
+    idx_kappa4 =  Vector{Int}()
+    idx_kappa5 =  Vector{Int}()
+    idx_count = 1    
+    Vi = zeros(k_ii,1)     # vector for equation i
+
+    for ii = 1:n
+        for j = 1:n*p+1       # for j=1:n*p+1 
+            l = ceil((j-1)/n)           # Here we need a float, as afterwards we will divide by l 
+            idx = mod(j-1,n);           # this will count if its own lag, non-own lag, or constant
+            if idx==0
+                idx = n;
+            end
+            if j == 1                   # Constant is the first element in each equation
+                Vi[j] = 1;
+                push!(idx_kappa4,idx_count)
+            elseif idx == ii            # These are the own lags of the variable
+                if l == 1 && data_trans == 1              # If we have levels instead of growth rates we add a "1" for the first lag
+                    β_prior[idx_count,] = 1.0;
+                end
+                Vi[j] = 1.0/l^2;
+                push!(idx_kappa1,idx_count)
+            else
+                Vi[j] = sigmaP_vec[ii]/(sigmaP_vec[idx]*(l^2));
+                push!(idx_kappa2,idx_count)
+            end
+            idx_count += 1        
+        end
+        for j = n*p+1+1:n*p+1+nex*vq   
+            idx = mod(mod(j-1,n),nex);      # this cycles through 1,2,3 and gives 0 when it reaches nex
+            lx = ceil((j-(n*p+1))/n)        # Discounting older lags
+            if idx == 0
+                idx = nex;
+            end
+            Vi[j] = sigmaP_vec[ii]/( sigmaPex_vec[idx]*(lx^2) );
+            push!(idx_kappa5,idx_count)
+            idx_count += 1
+        end
+
+        Cβ_vec[(ii-1)*k_ii+1:ii*k_ii] = Vi
+    end
+    
+    
+    Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c1;  # own lags
+    Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c2;  # other lags
+    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c4;  # constant
+    Vβ_vec[idx_kappa5] .= Cβ_vec[idx_kappa5] .* hyp_struct.c5;  # exogenous variables
+    Vβ_inv = diagm(1.0./Vβ_vec);
+    Vβ_inv_vecView = @view(Vβ_inv[diagind(Vβ_inv)]);
+    Vinvβ_prior = Vβ_inv*β_prior;
+    priorMinn_struct = BVARpriorMinn(β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa4, idx_kappa5, Ψ_vec)
 
     return priorMinn_struct
 
@@ -510,7 +593,7 @@ function update_priorMinn_broadcast!(prior_struct::BVARpriorMinn,hyp_struct::BEA
     # hot loops are faster than broadcasting
     @views prior_struct.Vβ_vec[prior_struct.idx_kappa1] .= prior_struct.Cβ_vec[prior_struct.idx_kappa1] .* hyp_struct.c1;  # own lags
     @views prior_struct.Vβ_vec[prior_struct.idx_kappa2] .= prior_struct.Cβ_vec[prior_struct.idx_kappa2] .* hyp_struct.c2;  # other lags
-    @views prior_struct.Vβ_vec[prior_struct.idx_kappa3] .= prior_struct.Cβ_vec[prior_struct.idx_kappa3] .* hyp_struct.c3;  # constants
+    @views prior_struct.Vβ_vec[prior_struct.idx_kappa4] .= prior_struct.Cβ_vec[prior_struct.idx_kappa4] .* hyp_struct.c4;  # constants
     
     prior_struct.Vβ_inv_vecView .= 1.0./prior_struct.Vβ_vec;
     mul!(prior_struct.Vinvβ_prior,prior_struct.Vβ_inv,prior_struct.β_prior)
@@ -523,15 +606,18 @@ end
     This is a hot loop version of update_priorMinn_broadcast!()
 """
 function update_priorMinn!(prior_struct::BEAVARs.BVARpriorMinn,hyp_struct::BEAVARs.BVARmodelHypSetup)
-    @unpack Cβ_vec, Vβ_vec, idx_kappa1, idx_kappa2, idx_kappa3, Vβ_inv_vecView, Vβ_inv,Vinvβ_prior,β_prior= prior_struct    
+    @unpack Cβ_vec, Vβ_vec, idx_kappa1, idx_kappa2, idx_kappa4, idx_kappa5, Vβ_inv_vecView, Vβ_inv,Vinvβ_prior,β_prior= prior_struct    
     for ii in eachindex(idx_kappa1)
         Vβ_vec[idx_kappa1[ii]] = 2.0*Cβ_vec[idx_kappa1[ii]] * hyp_struct.c1
     end
     for ii in eachindex(idx_kappa2)
         Vβ_vec[idx_kappa2[ii]] = 2.0*Cβ_vec[idx_kappa2[ii]] * hyp_struct.c2
     end
-    for ii in eachindex(idx_kappa3)
-        Vβ_vec[idx_kappa3[ii]] = 2.0*Cβ_vec[idx_kappa3[ii]] * hyp_struct.c3
+    for ii in eachindex(idx_kappa4)
+        Vβ_vec[idx_kappa4[ii]] = 2.0*Cβ_vec[idx_kappa4[ii]] * hyp_struct.c4
+    end
+    for ii in eachindex(idx_kappa5)
+        Vβ_vec[idx_kappa5[ii]] = 2.0*Cβ_vec[idx_kappa5[ii]] * hyp_struct.c5
     end
     Vβ_inv_vecView .= 1.0./Vβ_vec;
     mul!(Vinvβ_prior,Vβ_inv,β_prior);
@@ -715,32 +801,36 @@ end
     Uses a prior κj ∼ Gamma(c_{1,j}, c_{2,j}).
 """
 function update_hyp!(priorMinn_struct,β_hat_struct,hyp_struct,n,p)
-    @unpack β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa3, Ψ_vec = priorMinn_struct
-    @unpack c_11, c_12, c_21, c_22 = hyp_struct;
+    @unpack β_prior, Cβ_vec, Vβ_vec, Vβ_inv, Vβ_inv_vecView, Vinvβ_prior, idx_kappa1, idx_kappa2, idx_kappa4, Ψ_vec = priorMinn_struct
+    @unpack c1_1, c2_1, c1_2, c2_2 = hyp_struct;
     @unpack β_draw = β_hat_struct;
 
     sum_S_κ1 = sum( (β_draw[idx_kappa1] .- β_prior[idx_kappa1]).^2 ./(2.0.*Ψ_vec[idx_kappa1].*Cβ_vec[idx_kappa1]))
     sum_S_κ2 = sum( (β_draw[idx_kappa2] .- β_prior[idx_kappa2]).^2 ./(2.0.*Ψ_vec[idx_kappa2].*Cβ_vec[idx_kappa2]))
 
-    κ1 = BEAVARs.gigrnd(c_11 - 0.5*n*p, 2.0*c_21,sum_S_κ1,1)[];
-    κ2 = BEAVARs.gigrnd(c_12 - 0.5*(n-1)*n*p, 2.0*c_22,sum_S_κ2,1)[];
+    κ1 = BEAVARs.gigrnd(c1_1 - 0.5*n*p, 2.0*c1_2,sum_S_κ1,1)[];
+    κ2 = BEAVARs.gigrnd(c2_1 - 0.5*(n-1)*n*p, 2.0*c2_2,sum_S_κ2,1)[];
 
     return κ1, κ2
     
 end
 
-"""
+@doc raw"""
     update_hyp_llmopt!(priorMinn_struct,β_hat_struct,hyp_struct,n,p)
 
     Draw the Minnesota hyperparameters κ1 and κ2 using a Generalized Inverse Gaussian (GiG) distribution.
     
-    Uses a prior κj ∼ Gamma(c_{1,j}, c_{2,j}).
+    Uses a prior κj ∼ Gamma(c_{1,j}, c_{2,j}) and draws from
+    $$
+    p\left( \kappa_2 \mid \forall \right) 
+    \sim \mathcal{GIG} \left( c_{2,1} - \frac{(n - 1)np}{2}, \, 2c_{2,2}, \, \sum_{(i,j) \in S_{\kappa_2}} \frac{(\beta_{i,j} - \underline{\beta}_{i,j})^2}{2\psi_{i,j} C_{i,j}} \right)
+    $$
 
     An LLM-optimized version of update_hyp!(). There is a test that checks whether sum_S_k1 and sum_S_k2 are equivalent
 """
 function update_hyp_llmopt!(priorMinn_struct,β_hat_struct,hyp_struct,n,p)
     @unpack β_prior, Cβ_vec, idx_kappa1, idx_kappa2, Ψ_vec = priorMinn_struct
-    @unpack c_11, c_12, c_21, c_22 = hyp_struct;
+    @unpack c1_1, c2_1, c1_2, c2_2 = hyp_struct;
     @unpack β_draw = β_hat_struct;
 
     sum_S_κ1 = 0.0
@@ -755,8 +845,54 @@ function update_hyp_llmopt!(priorMinn_struct,β_hat_struct,hyp_struct,n,p)
         sum_S_κ2 += diff^2 / (2.0 * Ψ_vec[idx] * Cβ_vec[idx])
     end
 
-    κ1 = BEAVARs.gigrnd(c_11 - 0.5*n*p, 2.0*c_21, sum_S_κ1, 1)[1]
-    κ2 = BEAVARs.gigrnd(c_12 - 0.5*(n-1)*n*p, 2.0*c_22, sum_S_κ2, 1)[1]
+    κ1 = BEAVARs.gigrnd(c1_1 - 0.5*n*p, 2.0*c1_2, sum_S_κ1, 1)[1]
+    κ2 = BEAVARs.gigrnd(c2_1 - 0.5*(n-1)*n*p, 2.0*c2_2, sum_S_κ2, 1)[1]
 
     return κ1, κ2
+end
+
+
+
+@doc raw"""
+    update_hyp_llmopt!(priorMinn_struct,β_hat_struct,hyp_struct,n,p,nx,vq)
+
+    Draw the Minnesota hyperparameters κ1 and κ2 using a Generalized Inverse Gaussian (GiG) distribution.
+    
+    Uses a prior κj ∼ Gamma(c_{1,j}, c_{2,j}).
+
+    $$
+    p\left( \kappa_2 \mid \forall \right) 
+    \sim \mathcal{GIG} \left( c_{2,1} - \frac{(n - 1)np}{2}, \, 2c_{2,2}, \, \sum_{(i,j) \in S_{\kappa_2}} \frac{(\beta_{i,j} - \underline{\beta}_{i,j})^2}{2\psi_{i,j} C_{i,j}} \right)
+    $$
+
+"""
+function update_hyp_llmopt!(priorMinn_struct,β_hat_struct,hyp_struct,n,p,nx,vq)
+    @unpack β_prior, Cβ_vec, idx_kappa1, idx_kappa2, idx_kappa5, Ψ_vec = priorMinn_struct
+    @unpack c1_1, c2_1, c1_2, c2_2, c5_1, c5_2 = hyp_struct;
+    @unpack β_draw = β_hat_struct;
+
+    sum_S_κ1 = 0.0
+    for idx in idx_kappa1
+        diff = β_draw[idx] - β_prior[idx]
+        sum_S_κ1 += diff^2 / (2.0 * Ψ_vec[idx] * Cβ_vec[idx])
+    end
+
+    sum_S_κ2 = 0.0
+    for idx in idx_kappa2
+        diff = β_draw[idx] - β_prior[idx]
+        sum_S_κ2 += diff^2 / (2.0 * Ψ_vec[idx] * Cβ_vec[idx])
+    end
+
+    sum_S_κ5 = 0.0
+    for idx in idx_kappa5
+        diff = β_draw[idx] - β_prior[idx]
+        sum_S_κ5 += diff^2 / (2.0 * Ψ_vec[idx] * Cβ_vec[idx])
+    end
+
+
+    κ1 = BEAVARs.gigrnd(c1_1 - 0.5*n*p, 2.0*c1_2, sum_S_κ1, 1)[1]           # n*p is the number of c1 elements in β
+    κ2 = BEAVARs.gigrnd(c2_1 - 0.5*(n-1)*n*p, 2.0*c2_2, sum_S_κ2, 1)[1]     # (n-1)*n*p is the number of c2 elements
+    κ5 = BEAVARs.gigrnd(c5_1 - 0.5*nx*vq*n, 2.0*c5_2, sum_S_κ5, 1)[1]       # nx*vq*n is the number of c5 elements
+
+    return κ1, κ2, κ5
 end
