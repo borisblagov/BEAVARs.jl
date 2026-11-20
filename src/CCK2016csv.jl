@@ -466,7 +466,8 @@ function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BV
 
         if est_hyp == true
             κ1, κ2 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p)
-            hyp_struct = hypChan2020(c1=κ1,c2=κ2);
+            hyp_struct.c_hyp_vec[1] = κ1;
+            hyp_struct.c_hyp_vec[2] = κ2;
             BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
         end
 
@@ -478,8 +479,8 @@ function CCK2016csv(YY::Array{Float64},set_struct::BVARmodelSetup,hyp_struct::BV
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
-            store_c1[ii-n_burn,] = hyp_struct.c1;
-            store_c2[ii-n_burn,] = hyp_struct.c2;
+            store_c1[ii-n_burn,] = hyp_struct.c_hyp_vec[1];
+            store_c2[ii-n_burn,] = hyp_struct.c_hyp_vec[2];
         end
     end
     return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5
@@ -535,9 +536,9 @@ function CCK2016csv(YY,YX,set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSet
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
-            store_c1[ii-n_burn,] = hyp_struct.c1;
-            store_c2[ii-n_burn,] = hyp_struct.c2;
-            store_c5[ii-n_burn,] = hyp_struct.c5;
+            store_c1[ii-n_burn,] = hyp_struct.c_hyp_vec[1];
+            store_c2[ii-n_burn,] = hyp_struct.c_hyp_vec[2];
+            store_c5[ii-n_burn,] = hyp_struct.c_hyp_vec[5];
         end
     end
     return store_β, store_Σ, store_h, store_s2_h, store_ρ, store_σ_h2, store_eh,store_c1, store_c2, store_c5
@@ -603,10 +604,13 @@ function CCK2016(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,data_s
         if est_hyp == true
             if nex == 0
                 κ1, κ2 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p)
-                hyp_struct = hypChan2020(c1=κ1,c2=κ2);
+                hyp_struct.c_hyp_vec[1] = κ1;
+                hyp_struct.c_hyp_vec[2] = κ2;
             else
                 κ1, κ2, κ5 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p, nex, vq)
-                hyp_struct = hypChan2020(c1=κ1,c2=κ2,c5=κ5);
+                hyp_struct.c_hyp_vec[1] = κ1;
+                hyp_struct.c_hyp_vec[2] = κ2;
+                hyp_struct.c_hyp_vec[5] = κ5;
             end
             BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
         end
@@ -619,9 +623,9 @@ function CCK2016(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,data_s
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
-            store_c1[ii-n_burn,] = hyp_struct.c1;
-            store_c2[ii-n_burn,] = hyp_struct.c2;
-            store_c5[ii-n_burn,] = hyp_struct.c5;
+            store_c1[ii-n_burn,] = hyp_struct.c_hyp_vec[1];
+            store_c2[ii-n_burn,] = hyp_struct.c_hyp_vec[2];
+            store_c5[ii-n_burn,] = hyp_struct.c_hyp_vec[5];
         end
         # show progress bar
         if show_prog == true

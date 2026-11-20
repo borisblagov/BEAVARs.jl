@@ -489,9 +489,9 @@ function init_priorMinn(n,p,sigmaP_vec,data_trans,hyp_struct)
     end
     
     
-    Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c1;  # own lags
-    Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c2;  # other lags
-    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c4;  # constant
+    Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c_hyp_vec[1];  # own lags
+    Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c_hyp_vec[2];  # other lags
+    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c_hyp_vec[4];  # constant
     Vβ_inv = diagm(1.0./Vβ_vec);
     Vβ_inv_vecView = @view(Vβ_inv[diagind(Vβ_inv)]);
     Vinvβ_prior = Vβ_inv*β_prior;
@@ -568,10 +568,10 @@ function init_priorMinn(n,nex,p,vq,sigmaP_vec,sigmaPex_vec,data_trans,hyp_struct
     end
     
     
-    Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c1;  # own lags
-    Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c2;  # other lags
-    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c4;  # constant
-    Vβ_vec[idx_kappa5] .= Cβ_vec[idx_kappa5] .* hyp_struct.c5;  # exogenous variables
+    Vβ_vec[idx_kappa1] .= Cβ_vec[idx_kappa1] .* hyp_struct.c_hyp_vec[1];  # own lags
+    Vβ_vec[idx_kappa2] .= Cβ_vec[idx_kappa2] .* hyp_struct.c_hyp_vec[2];  # other lags
+    Vβ_vec[idx_kappa4] .= Cβ_vec[idx_kappa4] .* hyp_struct.c_hyp_vec[4];  # constant
+    Vβ_vec[idx_kappa5] .= Cβ_vec[idx_kappa5] .* hyp_struct.c_hyp_vec[5];  # exogenous variables
     Vβ_inv = diagm(1.0./Vβ_vec);
     Vβ_inv_vecView = @view(Vβ_inv[diagind(Vβ_inv)]);
     Vinvβ_prior = Vβ_inv*β_prior;
@@ -591,9 +591,9 @@ end
 """
 function update_priorMinn_broadcast!(prior_struct::BVARpriorMinn,hyp_struct::BEAVARs.BVARmodelHypSetup)
     # hot loops are faster than broadcasting
-    @views prior_struct.Vβ_vec[prior_struct.idx_kappa1] .= prior_struct.Cβ_vec[prior_struct.idx_kappa1] .* hyp_struct.c1;  # own lags
-    @views prior_struct.Vβ_vec[prior_struct.idx_kappa2] .= prior_struct.Cβ_vec[prior_struct.idx_kappa2] .* hyp_struct.c2;  # other lags
-    @views prior_struct.Vβ_vec[prior_struct.idx_kappa4] .= prior_struct.Cβ_vec[prior_struct.idx_kappa4] .* hyp_struct.c4;  # constants
+    @views prior_struct.Vβ_vec[prior_struct.idx_kappa1] .= prior_struct.Cβ_vec[prior_struct.idx_kappa1] .* hyp_struct.c_hyp_vec[1];  # own lags
+    @views prior_struct.Vβ_vec[prior_struct.idx_kappa2] .= prior_struct.Cβ_vec[prior_struct.idx_kappa2] .* hyp_struct.c_hyp_vec[2];  # other lags
+    @views prior_struct.Vβ_vec[prior_struct.idx_kappa4] .= prior_struct.Cβ_vec[prior_struct.idx_kappa4] .* hyp_struct.c_hyp_vec[4];  # constants
     
     prior_struct.Vβ_inv_vecView .= 1.0./prior_struct.Vβ_vec;
     mul!(prior_struct.Vinvβ_prior,prior_struct.Vβ_inv,prior_struct.β_prior)
@@ -608,16 +608,16 @@ end
 function update_priorMinn!(prior_struct::BEAVARs.BVARpriorMinn,hyp_struct::BEAVARs.BVARmodelHypSetup)
     @unpack Cβ_vec, Vβ_vec, idx_kappa1, idx_kappa2, idx_kappa4, idx_kappa5, Vβ_inv_vecView, Vβ_inv,Vinvβ_prior,β_prior= prior_struct    
     for ii in eachindex(idx_kappa1)
-        Vβ_vec[idx_kappa1[ii]] = 2.0*Cβ_vec[idx_kappa1[ii]] * hyp_struct.c1
+        Vβ_vec[idx_kappa1[ii]] = 2.0*Cβ_vec[idx_kappa1[ii]] * hyp_struct.c_hyp_vec[1]
     end
     for ii in eachindex(idx_kappa2)
-        Vβ_vec[idx_kappa2[ii]] = 2.0*Cβ_vec[idx_kappa2[ii]] * hyp_struct.c2
+        Vβ_vec[idx_kappa2[ii]] = 2.0*Cβ_vec[idx_kappa2[ii]] * hyp_struct.c_hyp_vec[2]
     end
     for ii in eachindex(idx_kappa4)
-        Vβ_vec[idx_kappa4[ii]] = 2.0*Cβ_vec[idx_kappa4[ii]] * hyp_struct.c4
+        Vβ_vec[idx_kappa4[ii]] = 2.0*Cβ_vec[idx_kappa4[ii]] * hyp_struct.c_hyp_vec[4]
     end
     for ii in eachindex(idx_kappa5)
-        Vβ_vec[idx_kappa5[ii]] = 2.0*Cβ_vec[idx_kappa5[ii]] * hyp_struct.c5
+        Vβ_vec[idx_kappa5[ii]] = 2.0*Cβ_vec[idx_kappa5[ii]] * hyp_struct.c_hyp_vec[5]
     end
     Vβ_inv_vecView .= 1.0./Vβ_vec;
     mul!(Vinvβ_prior,Vβ_inv,β_prior);

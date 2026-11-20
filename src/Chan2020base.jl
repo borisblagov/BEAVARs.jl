@@ -16,26 +16,27 @@ Populate a hyperparamater structure for models based on Chan (2020) priors
         ρ:  ar(1) parameter for the stochastic volatility (for csv models only)
         σ_h2: variance of the log-volatility (for csv models only)
 """
-@with_kw struct hypChan2020 <: BVARmodelHypSetup
-    c1::Float64     = 0.04;         # hyperparameter on own lags
-    c2::Float64     = 0.01;         # hyperparameter on other lags
-    c4::Float64     = 100.0;        # hyperparameter on the constant
-    c5::Float64     = 0.01;         # hyperparameter on other lags
-    ρ::Float64      = 0.8;
-    σ_h2::Float64   = 0.1;
-    v_h0::Float64   = 5.0; 
-    S_h0::Float64   = 0.01*(v_h0-1.0); 
-    ρ_0::Float64    = 0.9;         # prior for ρ_0, the t=0 value of the autoregressive coefficient
-    V_ρ::Float64    = 0.04;
-    q::Float64      = 0.5;
-    nu0::Int        = 3;           # degrees of freedom to add for the inverse wishart distribution of the variance-covariance matrices
-    c1_1::Float64   = 1.0;         # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), lower bound 
-    c1_2::Float64   = 25.0;        # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), upper bound, 1.0/ 0.04 
-    c2_1::Float64   = 1.0;         # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), lower bound
-    c2_2::Float64   = 625.0;       # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), upper bound, 1.0/(0.04^2)
-    c5_1::Float64   = 1.0;         # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), lower bound
-    c5_2::Float64   = 625.0;       # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), upper bound, 1.0/(0.04^2)
-    ν_ψ::Float64    = 0.5;         # for global-local priors ν_ψ ∼ Gamma(d1,d2) and ψ_ij ∼ Gamma(ν_ψ, ν_ψ/2)
+@with_kw struct hypChan2020{T<:AbstractFloat} <: BVARmodelHypSetup
+    c1::T     = 0.04;         # hyperparameter on own lags
+    c2::T     = 0.01;         # hyperparameter on other lags
+    c4::T     = 100.0;        # hyperparameter on the constant
+    c5::T     = 0.01;         # hyperparameter on other lags
+    ρ::T      = 0.8;
+    σ_h2::T   = 0.1;
+    v_h0::T   = 5.0; 
+    S_h0::T   = 0.01*(v_h0-1.0); 
+    ρ_0::T    = 0.9;         # prior for ρ_0, the t=0 value of the autoregressive coefficient
+    V_ρ::T    = 0.04;
+    q::T      = 0.5;
+    nu0::Int  = 3;           # degrees of freedom to add for the inverse wishart distribution of the variance-covariance matrices
+    c1_1::T   = 1.0;         # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), lower bound 
+    c1_2::T   = 25.0;        # hyper-hyperparameter for c1 ∼ Gamma(c1_1,c2_1), upper bound, 1.0/ 0.04 
+    c2_1::T   = 1.0;         # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), lower bound
+    c2_2::T   = 625.0;       # hyper-hyperparameter for c2 ∼ Gamma(c1_2,c2_2), upper bound, 1.0/(0.04^2)
+    c5_1::T   = 1.0;         # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), lower bound
+    c5_2::T   = 625.0;       # hyper-hyperparameter for c5 ∼ Gamma(c5_1,c5_2), upper bound, 1.0/(0.04^2)
+    ν_ψ::T    = 0.5;         # for global-local priors ν_ψ ∼ Gamma(d1,d2) and ψ_ij ∼ Gamma(ν_ψ, ν_ψ/2)
+    c_hyp_vec::Vector{T} = [c1; c2; 0.0; c4; c5];    # for updating the hyperparameters in an easier manner with unmutable struct
 end
 
 
@@ -301,7 +302,10 @@ are referred to as ``\kappa_1``, ``\kappa_2``, and ``\kappa_4`` (``\kappa_3`` is
 
 """
 function prior_Minn(n::Integer,p::Integer,sigmaP_vec::Vector{},hypSetup::BVARmodelHypSetup,data_trans::Integer)    
-    @unpack c1,c2,c4 = hypSetup
+    # @unpack c1,c2,c4 = hypSetup
+    c1 = hypSetup.c_hyp_vec[1];
+    c2 = hypSetup.c_hyp_vec[2];
+    c4 = hypSetup.c_hyp_vec[4];
     C = zeros(n^2*p+n,);
     βMinn = zeros(n^2*p+n);                         # initialize the prior mean for growth rates, e.g. center at 0
     np1 = n*p+1                                     # number of parameters per equation
@@ -360,7 +364,9 @@ Note that C is now (n*p+1 x 1) and not n^2*p+n as [`prior_Minn(x)`](@ref)
 
 """
 function prior_NatConj(n::Integer,p::Integer,sigmaP_vec::Vector{Float64},hypSetup)    
-    @unpack c1,c4 = hypSetup;
+    # @unpack c1,c4 = hypSetup;
+    c1 = hypSetup.c_hyp_vec[1];
+    c4 = hypSetup.c_hyp_vec[4];
     np1 = n*p+1 # number of parameters per equation
     # TODO these indices here idx_kappa1 and idx_kappa2 are wrong! idx_kappa1 is not the own lags but all except the constant. Also, C is not C but V_minn because it already incorporates sigmaP
     idx_kappa1 =  Vector{Int}()

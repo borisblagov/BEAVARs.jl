@@ -187,7 +187,8 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
 
         if est_hyp == true
             κ1, κ2 = BEAVARs.update_hyp_llmopt!(priorMinn_struct,β_hat_bb_struct,hyp_struct,n,p)
-            hyp_struct = hypChan2020(c1=κ1,c2=κ2);
+            hyp_struct.c_hyp_vec[1] = κ1;
+            hyp_struct.c_hyp_vec[2] = κ2;
             BEAVARs.update_priorMinn!(priorMinn_struct,hyp_struct);
         end
 
@@ -202,8 +203,8 @@ function Blagov2027(dataHF_tab::TimeArray{Typ,Ntyp,Dtyp,Atyp},dataLF_tab::TimeAr
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
-            store_c1[ii-n_burn,] = hyp_struct.c1;
-            store_c2[ii-n_burn,] = hyp_struct.c2;
+            store_c1[ii-n_burn,] = hyp_struct.c_hyp_vec[1];
+            store_c2[ii-n_burn,] = hyp_struct.c_hyp_vec[2];
         end
 
         # show progress bar
@@ -367,8 +368,8 @@ function Blagov2027(set_struct::BVARmodelSetup,hyp_struct::BVARmodelHypSetup,dat
             store_ρ[ii-n_burn,] = csv_h_struct.ρ_vec[1];
             store_σ_h2[ii-n_burn,] = csv_h_struct.σ_h2_vec[1];
             store_eh[:,ii-n_burn] = csv_h_struct.eh;
-            store_c1[ii-n_burn,] = hyp_struct.c1;
-            store_c2[ii-n_burn,] = hyp_struct.c2;
+            store_c1[ii-n_burn,] = hyp_struct.c_hyp_vec[1];
+            store_c2[ii-n_burn,] = hyp_struct.c_hyp_vec[2];
         end
 
         # show progress bar
